@@ -623,6 +623,11 @@ public class BilliardsModule : UdonSharpBehaviour
             networkingManager.noLockingSynced
         );
 
+        if (gameStateLocal != networkingManager.gameStateSynced && networkingManager.gameStateSynced == 1)
+        {
+            Array.Clear(playerNamesCached, 0, playerNamesCached.Length);
+        }
+
         // propagate valid players second
         onRemotePlayersChanged(networkingManager.playerNamesSynced);
 
