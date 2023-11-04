@@ -1700,6 +1700,12 @@ public class BilliardsModule : UdonSharpBehaviour
 
     private void applyCueAccess(bool gameOver)
     {
+        if (gameOver)
+        {
+            if (_TeamPlayersOffline(0)) cueControllers[0]._SetAuthorizedOwners(Networking.IsMaster ? new[] { Networking.LocalPlayer.displayName } : new string[0]);
+            if (_TeamPlayersOffline(1)) cueControllers[1]._SetAuthorizedOwners(Networking.IsMaster ? new[] { Networking.LocalPlayer.displayName } : new string[0]);
+        }
+
         if (localPlayerId == -1)
         {
             cueControllers[0]._Disable(gameOver);
@@ -1876,6 +1882,23 @@ public class BilliardsModule : UdonSharpBehaviour
     {
         for (int i = 0; i < 4; i++)
         {
+            if (playerNamesLocal[i] == "") continue;
+
+            VRCPlayerApi player = _GetPlayerByName(playerNamesLocal[i]);
+            if (Utilities.IsValid(player))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public bool _TeamPlayersOffline(uint teamId)
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            if (teamId != (uint)(i & 0x1u)) continue;
             if (playerNamesLocal[i] == "") continue;
 
             VRCPlayerApi player = _GetPlayerByName(playerNamesLocal[i]);
