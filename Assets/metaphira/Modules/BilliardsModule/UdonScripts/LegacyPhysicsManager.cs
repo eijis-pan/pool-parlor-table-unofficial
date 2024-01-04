@@ -269,7 +269,7 @@ public class LegacyPhysicsManager : UdonSharpBehaviour
         {
             if (Mathf.Abs(balls_P[0].x) > table.k_TABLE_WIDTH + 0.1 || Mathf.Abs(balls_P[0].z) > table.k_TABLE_HEIGHT + 0.1)
             {
-                table._TriggerPocketBall(0);
+                table._TriggerPocketBall(0, -1);
                 table._Log("out of bounds! " + balls_P[0].ToString());
                 outOfBounds = true;
             }
@@ -533,7 +533,7 @@ public class LegacyPhysicsManager : UdonSharpBehaviour
 
     private bool isCueBallTouching()
     {
-        if (table.is8Ball) // 8 ball
+        if (table.is8Ball || table.isOnePocket15Ball) // 8 ball
         {
             // Check all
             for (int i = 1; i < 16; i++)
@@ -544,10 +544,20 @@ public class LegacyPhysicsManager : UdonSharpBehaviour
                 }
             }
         }
-        else if (table.is9Ball) // 9
+        else if (table.is9Ball || table.isOnePocket9Ball) // 9
         {
             // Only check to 9 ball
             for (int i = 1; i <= 9; i++)
+            {
+                if ((balls_P[0] - balls_P[i]).sqrMagnitude < k_BALL_DSQR)
+                {
+                    return true;
+                }
+            }
+        }
+        else if (table.isOnePocket5Ball)
+        {
+            for (int i = 2; i <= 6; i++)
             {
                 if ((balls_P[0] - balls_P[i]).sqrMagnitude < k_BALL_DSQR)
                 {
@@ -620,6 +630,7 @@ public class LegacyPhysicsManager : UdonSharpBehaviour
         Vector3 source_v = balls_V[id];
         if (Vector3.Dot(source_v, N) > 0.0f)
         {
+            table._TriggerCushion(id, balls_P[id]);
             return;
         }
 
@@ -664,6 +675,8 @@ public class LegacyPhysicsManager : UdonSharpBehaviour
         // Unrotate result
         balls_V[id] += rb * V1;
         balls_W[id] += rb * W1;
+        
+        table._TriggerCushion(id, balls_P[id]);
     }
 
 
@@ -810,7 +823,7 @@ public class LegacyPhysicsManager : UdonSharpBehaviour
         {
             balls_V[id] = Vector3.zero;
             balls_W[id] = Vector3.zero;
-            table._TriggerPocketBall(id);
+            table._TriggerPocketBall(id, (0 < balls_P[id].z ? (0 < balls_P[id].x ? 0 : 2) : (0 < balls_P[id].x ? 1 : 3)));
             return;
         }
 
@@ -818,7 +831,7 @@ public class LegacyPhysicsManager : UdonSharpBehaviour
         {
             balls_V[id] = Vector3.zero;
             balls_W[id] = Vector3.zero;
-            table._TriggerPocketBall(id);
+            table._TriggerPocketBall(id, 0 <= balls_P[id].z ? 4 : 5);
             return;
         }
 
@@ -826,7 +839,7 @@ public class LegacyPhysicsManager : UdonSharpBehaviour
         {
             balls_V[id] = Vector3.zero;
             balls_W[id] = Vector3.zero;
-            table._TriggerPocketBall(id);
+            table._TriggerPocketBall(id, 0 <= balls_P[id].z ? 4 : 5);
             return;
         }
 
@@ -834,7 +847,7 @@ public class LegacyPhysicsManager : UdonSharpBehaviour
         {
             balls_V[id] = Vector3.zero;
             balls_W[id] = Vector3.zero;
-            table._TriggerPocketBall(id);
+            table._TriggerPocketBall(id, (0 < balls_P[id].z ? (0 < balls_P[id].x ? 0 : 2) : (0 < balls_P[id].x ? 1 : 3)));
             return;
         }
     }

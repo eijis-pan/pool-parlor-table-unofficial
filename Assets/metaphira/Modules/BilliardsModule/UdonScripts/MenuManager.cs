@@ -1,4 +1,9 @@
-﻿using System;
+﻿#define TKCH_ONEPOCKET_SCORE
+
+//#define TKCH_DEBUG_GAMEMODE
+//#define TKCH_DEBUG_POINT_POCKET_MARKER
+
+using System;
 using UdonSharp;
 using UnityEngine;
 using UnityEngine.UI;
@@ -6,7 +11,7 @@ using UnityEngine.UI;
 [UdonBehaviourSyncMode(BehaviourSyncMode.NoVariableSync)]
 public class MenuManager : UdonSharpBehaviour
 {
-    private readonly uint[] TIMER_VALUES = new uint[] { 0, 60, 30, 15 };
+    private readonly uint[] TIMER_VALUES = new uint[] { 0, 300, 150, 60 };
 
     [SerializeField] private GameObject menuBase;
     [SerializeField] public GameObject menuSettings;
@@ -16,11 +21,15 @@ public class MenuManager : UdonSharpBehaviour
     [SerializeField] private GameObject teamCover;
     [SerializeField] private GameObject timelimitDisplay;
 
+    [SerializeField] public UIButton button8Win;
+    [SerializeField] public UIButton button5Win;
+    [SerializeField] public UIButton button3Win;
     [SerializeField] public UIButton button8Ball;
     [SerializeField] public UIButton button9Ball;
     [SerializeField] public UIButton button4Ball;
     [SerializeField] public UIButton button4BallJP;
     [SerializeField] public UIButton button4BallKR;
+    [SerializeField] public UIButton[] buttonPocketToggles;
     [SerializeField] public UIButton buttonTimerLeft;
     [SerializeField] public UIButton buttonTimerRight;
     [SerializeField] public UIButton buttonTeamsToggle;
@@ -40,6 +49,12 @@ public class MenuManager : UdonSharpBehaviour
 
     public void _Init(BilliardsModule table_)
     {
+        button8Ball.gameObject.SetActive(false);
+        button9Ball.gameObject.SetActive(false);
+        button4Ball.gameObject.SetActive(false);
+        button4BallJP.gameObject.SetActive(false);
+        button4BallKR.gameObject.SetActive(false);
+        
         table = table_;
         
         _RefreshTimer();
@@ -74,8 +89,14 @@ public class MenuManager : UdonSharpBehaviour
     // View gamemode changes
     public void _RefreshGameMode()
     {
+#if TKCH_DEBUG_GAMEMODE
+        table._LogInfo("TKCH MenuManager::_RefreshGameMode()");
+#endif
         uint menuGameMode = table.gameModeLocal;
 
+        button8Win._ResetPushButton();
+        button5Win._ResetPushButton();
+        button3Win._ResetPushButton();
         button8Ball._ResetPushButton();
         button9Ball._ResetPushButton();
         button4Ball._ResetPushButton();
@@ -105,6 +126,21 @@ public class MenuManager : UdonSharpBehaviour
                 button4BallKR._SetButtonPushed();
                 button4BallJP.gameObject.SetActive(true);
                 button4BallKR.gameObject.SetActive(true);
+                break;
+            case BilliardsModule.GAME_MODE_ONEPOCKET15:
+                button8Win._SetButtonPushed();
+                button4BallJP.gameObject.SetActive(false);
+                button4BallKR.gameObject.SetActive(false);
+                break;
+            case BilliardsModule.GAME_MODE_ONEPOCKET9:
+                button5Win._SetButtonPushed();
+                button4BallJP.gameObject.SetActive(false);
+                button4BallKR.gameObject.SetActive(false);
+                break;
+            case BilliardsModule.GAME_MODE_ONEPOCKET5:
+                button3Win._SetButtonPushed();
+                button4BallJP.gameObject.SetActive(false);
+                button4BallKR.gameObject.SetActive(false);
                 break;
         }
     }
@@ -164,6 +200,27 @@ public class MenuManager : UdonSharpBehaviour
             lobbyNames[i].text = table.graphicsManager._FormatName(table.playerNamesLocal[i]);
         }
 
+#if TKCH_ONEPOCKET_SCORE
+        for (int i = 0; i < 2; i++)
+        {
+            string teamName = i == 0 ? "[Orange]" : "[Blue]";
+            string name = table.playerNamesLocal[i];
+            if (name != "")
+            {
+                teamName = name;
+            }
+            if (table.teamsLocal)
+            {
+                name = table.playerNamesLocal[i + 2];
+                if (name != "")
+                {
+                    teamName += "\n" + name;
+                }
+            }
+            table.scoreScreen.UpdateTeamName(i, teamName);
+        }
+#endif
+
         refreshJoinButtons();
     }
 
@@ -182,9 +239,27 @@ public class MenuManager : UdonSharpBehaviour
 
     public void _RefreshToggleSettings()
     {
+#if TKCH_DEBUG_POINT_POCKET_MARKER
+        table._LogInfo("TKCH MenuManager::_RefreshToggleSettings()");
+#endif
         buttonTeamsToggle._SetButtonToggle(table.teamsLocal);
         buttonGuidelineToggle._SetButtonToggle(!table.noGuidelineLocal);
         buttonLockingToggle._SetButtonToggle(!table.noLockingLocal);
+
+        //uint pockets = (table.targetPocketedLocal[1] & table.one_pocket_point_pocket_mask) >> 24;
+        uint pockets = table.pointPocketsLocal;
+#if TKCH_DEBUG_POINT_POCKET_MARKER
+        table._LogInfo($"  pockets = {pockets}");
+#endif
+        for (int i = 0; i < buttonPocketToggles.Length; i++)
+        {
+            bool toggle = ((pockets >> i) & 0x1u) != 0;
+#if TKCH_DEBUG_POINT_POCKET_MARKER
+            table._LogInfo($"  i = {i}, toggle = {toggle}");
+#endif
+            buttonPocketToggles[i]._SetButtonToggle(toggle);
+        }
+        table.graphicsManager._UpdatePointPocketMarker(pockets);
 
         _RefreshPlayerList();
     }
@@ -192,11 +267,20 @@ public class MenuManager : UdonSharpBehaviour
     public void _RefreshLobbyOpen()
     {
         bool isNormalPlayer = table.localPlayerId != 0;
+        button8Win.disableInteractions = isNormalPlayer;
+        button5Win.disableInteractions = isNormalPlayer;
+        button3Win.disableInteractions = isNormalPlayer;
         button8Ball.disableInteractions = isNormalPlayer;
         button9Ball.disableInteractions = isNormalPlayer;
         button4Ball.disableInteractions = isNormalPlayer;
         button4BallJP.disableInteractions = isNormalPlayer;
         button4BallKR.disableInteractions = isNormalPlayer;
+        //buttonPocketToggles[0].disableInteractions = true;
+        //buttonPocketToggles[1].disableInteractions = true;
+        for (int i = 0; i < buttonPocketToggles.Length; i++)
+        {
+            buttonPocketToggles[i].disableInteractions = isNormalPlayer;
+        }
         buttonTeamsToggle.disableInteractions = isNormalPlayer;
         buttonGuidelineToggle.disableInteractions = isNormalPlayer;
         buttonLockingToggle.disableInteractions = isNormalPlayer;
@@ -211,6 +295,9 @@ public class MenuManager : UdonSharpBehaviour
     public void _OnButtonPressed() { onButtonPressed(inButton); }
     private void onButtonPressed(UIButton button)
     {
+#if TKCH_DEBUG_GAMEMODE || TKCH_DEBUG_POINT_POCKET_MARKER
+        table._LogInfo($"TKCH MenuManager::onButtonPressed() gameMode = {table.gameModeLocal}");
+#endif
         if (button.name == "StartButton")
         {
             table._TriggerLobbyOpen();
@@ -257,6 +344,33 @@ public class MenuManager : UdonSharpBehaviour
             else if (button.name == "4BallKR")
             {
                 table._TriggerGameModeChanged(3);
+            }
+            else if (button.name == "8Win")
+            {
+                table._TriggerGameModeChanged(BilliardsModule.GAME_MODE_ONEPOCKET15);
+            }
+            else if (button.name == "5Win")
+            {
+                table._TriggerGameModeChanged(BilliardsModule.GAME_MODE_ONEPOCKET9);
+            }
+            else if (button.name == "3Win")
+            {
+                table._TriggerGameModeChanged(BilliardsModule.GAME_MODE_ONEPOCKET5);
+            }
+            else if (button.name.StartsWith("Pocket") && button.name.EndsWith("Toggle"))
+            {
+                int pocket = Array.IndexOf(buttonPocketToggles, button);
+#if TKCH_DEBUG_POINT_POCKET_MARKER
+                table._LogInfo($"  pocket = {pocket}");
+#endif
+                if (0 <= pocket)
+                {
+                    if (!table._TriggerPocketChanged(button.toggleState, (uint)pocket))
+                    {
+                        //button.toggleState = !button.toggleState;
+                        _RefreshToggleSettings();
+                    }
+                }
             }
             else if (button.name == "TeamsToggle")
             {

@@ -457,7 +457,7 @@ public class BetaPhysicsManager : UdonSharpBehaviour
                         // table.LogInfo(balls[srcId] + " phased into pocket " + pockets[pocketCollider]);
                         pocketed[srcId] = true;
                         hitCushionMaybe = false;
-                        table._TriggerPocketBall(srcId);
+                        table._TriggerPocketBall(srcId, -1);
                         balls_V[srcId] = Vector3.zero;
                         balls_W[srcId] = Vector3.zero;
                     }
@@ -811,7 +811,7 @@ public class BetaPhysicsManager : UdonSharpBehaviour
 
     private bool isCueBallTouching()
     {
-        if (table.is8Ball) // 8 ball
+        if (table.is8Ball || table.isOnePocket15Ball) // 8 ball
         {
             // Check all
             for (int i = 1; i < 16; i++)
@@ -822,10 +822,20 @@ public class BetaPhysicsManager : UdonSharpBehaviour
                 }
             }
         }
-        else if (table.is9Ball) // 9
+        else if (table.is9Ball || table.isOnePocket9Ball) // 9
         {
             // Only check to 9 ball
             for (int i = 1; i <= 9; i++)
+            {
+                if ((balls_P[0] - balls_P[i]).sqrMagnitude < k_BALL_DSQR)
+                {
+                    return true;
+                }
+            }
+        }
+        else if (table.isOnePocket5Ball)
+        {
+            for (int i = 2; i <= 6; i++)
             {
                 if ((balls_P[0] - balls_P[i]).sqrMagnitude < k_BALL_DSQR)
                 {
@@ -942,6 +952,8 @@ public class BetaPhysicsManager : UdonSharpBehaviour
         // Unrotate result
         balls_V[id] += rb * V1;
         balls_W[id] += rb * W1;
+        
+        table._TriggerCushion(id, balls_P[id]);
     }
 
 
@@ -1092,7 +1104,7 @@ public class BetaPhysicsManager : UdonSharpBehaviour
         {
             balls_V[id] = Vector3.zero;
             balls_W[id] = Vector3.zero;
-            table._TriggerPocketBall(id);
+            table._TriggerPocketBall(id, (0 < balls_P[id].z ? (0 < balls_P[id].x ? 0 : 2) : (0 < balls_P[id].x ? 1 : 3)));
             return;
         }
 
@@ -1100,7 +1112,7 @@ public class BetaPhysicsManager : UdonSharpBehaviour
         {
             balls_V[id] = Vector3.zero;
             balls_W[id] = Vector3.zero;
-            table._TriggerPocketBall(id);
+            table._TriggerPocketBall(id, 0 <= balls_P[id].z ? 4 : 5);
             return;
         }
 
@@ -1108,7 +1120,7 @@ public class BetaPhysicsManager : UdonSharpBehaviour
         {
             balls_V[id] = Vector3.zero;
             balls_W[id] = Vector3.zero;
-            table._TriggerPocketBall(id);
+            table._TriggerPocketBall(id, 0 <= balls_P[id].z ? 4 : 5);
             return;
         }
 
@@ -1116,7 +1128,7 @@ public class BetaPhysicsManager : UdonSharpBehaviour
         {
             balls_V[id] = Vector3.zero;
             balls_W[id] = Vector3.zero;
-            table._TriggerPocketBall(id);
+            table._TriggerPocketBall(id, (0 < balls_P[id].z ? (0 < balls_P[id].x ? 0 : 2) : (0 < balls_P[id].x ? 1 : 3)));
             return;
         }
     }
