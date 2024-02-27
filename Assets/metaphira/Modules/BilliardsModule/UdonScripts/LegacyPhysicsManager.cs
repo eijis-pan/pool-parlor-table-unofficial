@@ -1,4 +1,7 @@
-﻿
+﻿#define TKCH_5BALL_HIDE8
+
+//#define TKCH_DEBUG_CUSHION
+
 using System;
 using UdonSharp;
 using UnityEngine;
@@ -557,7 +560,11 @@ public class LegacyPhysicsManager : UdonSharpBehaviour
         }
         else if (table.isOnePocket5Ball)
         {
+#if TKCH_5BALL_HIDE8
             for (int i = 2; i <= 6; i++)
+#else
+            for (int i = 1; i <= 5; i++)
+#endif
             {
                 if ((balls_P[0] - balls_P[i]).sqrMagnitude < k_BALL_DSQR)
                 {
@@ -630,7 +637,11 @@ public class LegacyPhysicsManager : UdonSharpBehaviour
         Vector3 source_v = balls_V[id];
         if (Vector3.Dot(source_v, N) > 0.0f)
         {
-            table._TriggerCushion(id, balls_P[id]);
+#if TKCH_DEBUG_CUSHION
+            table._TriggerCushion(id, balls_P[id], -1, true);
+#else
+            table._TriggerCushion(id, balls_P[id], -1);
+#endif
             return;
         }
 
@@ -676,7 +687,11 @@ public class LegacyPhysicsManager : UdonSharpBehaviour
         balls_V[id] += rb * V1;
         balls_W[id] += rb * W1;
         
-        table._TriggerCushion(id, balls_P[id]);
+#if TKCH_DEBUG_CUSHION
+        table._TriggerCushion(id, balls_P[id], -1, false);
+#else
+        table._TriggerCushion(id, balls_P[id], -1);
+#endif
     }
 
 

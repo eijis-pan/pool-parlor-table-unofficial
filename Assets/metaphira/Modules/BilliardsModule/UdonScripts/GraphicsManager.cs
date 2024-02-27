@@ -1,6 +1,9 @@
-﻿//#define TKCH_DEBUG_SCORECARD
+﻿#define TKCH_5BALL_HIDE8
+
+//#define TKCH_DEBUG_SCORECARD
 //#define TKCH_DEBUG_TEAM_COLOR
 //#define TKCH_DEBUG_POINT_POCKET_MARKER
+//#define TKCH_DEBUG_SPAWN_POINT
 
 using UdonSharp;
 using UnityEngine;
@@ -24,6 +27,17 @@ public class GraphicsManager : UdonSharpBehaviour
     [SerializeField] Material onePocketPointBlue;
     [SerializeField] Material onePocketPointOrange;
     [SerializeField] Material denyBallShadowMaterial;
+
+    [Header("Bank Pool")]
+    [SerializeField] GameObject bankCushionTouch;
+    [SerializeField] Material calledPocketBlue;
+    [SerializeField] Material calledPocketOrange;
+    [SerializeField] Material calledPocketSphereBlue;
+    [SerializeField] Material calledPocketSphereOrange;
+    [SerializeField] Material calledPocketSphereWhite;
+    [SerializeField] Material calleShotLockBlue;
+    [SerializeField] Material calleShotLockOrange;
+    [SerializeField] Material calleShotLockWhite;
 
     [Header("Text")]
     [SerializeField] GameObject scorecardHolder;
@@ -509,6 +523,9 @@ public class GraphicsManager : UdonSharpBehaviour
 
     public void _SpawnOnePocketPoint(Vector3 pos, bool plus, int color)
     {
+#if TKCH_DEBUG_SPAWN_POINT
+        table._LogInfo($"TKCH GraphicsManager::_SpawnOnePocketPoint(plus = {plus}, color = {color})");
+#endif
         for (int i = 0; i < onePocketPoint.Length; i++)
         {
             if (onePocketPointActive[i]) continue;
@@ -777,12 +794,17 @@ int uniform_cue_colour;
         }
         else if (table.isOnePocket5Ball)
         {
-            for (int i = 0; i <= 6; i++)
+            for (int i = 0; i < 7; i++)
                 table.balls[i].SetActive(true);
 
+#if TKCH_5BALL_HIDE8
             table.balls[1].SetActive(false);
             for (int i = 7; i < 16; i++)
                 table.balls[i].SetActive(false);
+#else
+            for (int i = 6; i < 16; i++)
+                table.balls[i].SetActive(false);
+#endif
         }
         else
         {
@@ -915,6 +937,7 @@ int uniform_cue_colour;
         table.transform.Find("intl.controls/undo").gameObject.SetActive(false);
         table.transform.Find("intl.controls/redo").gameObject.SetActive(false);
         table.transform.Find("intl.controls/skipturn").gameObject.SetActive(false);
+        table.transform.Find("intl.controls/callShotLock").gameObject.SetActive(false);
         _HideTimers();
 
         winnerText.text = "";
@@ -974,8 +997,8 @@ int uniform_cue_colour;
         }
         else if (table.isOnePocket)
         {
-            scorecard.SetInt("_LeftScore", (table.fbScoresLocal[0] < 0 ? 0 : table.fbScoresLocal[0]) + (table.isOnePocket15Ball ? 2 : 5));
-            scorecard.SetInt("_RightScore", (table.fbScoresLocal[1] < 0 ? 0 : table.fbScoresLocal[1]) + (table.isOnePocket15Ball ? 2 : 5));
+            scorecard.SetInt("_LeftScore", (table.fbScoresLocal[0] < 0 ? 0 : table.fbScoresLocal[0]) + (table.isOnePocket15Ball ? 2 : (table.isOnePocket9Ball ? 5 : 7)));
+            scorecard.SetInt("_RightScore", (table.fbScoresLocal[1] < 0 ? 0 : table.fbScoresLocal[1]) + (table.isOnePocket15Ball ? 2 : (table.isOnePocket9Ball ? 5 : 7)));
             scorecardColors[0] = pColour1 / 1.5f;
             scorecardColors[1] = pColour0 / 1.5f;
             scorecard.SetColorArray("_Colors", scorecardColors);
@@ -1110,14 +1133,39 @@ int uniform_cue_colour;
         }
     }
 
-    public void _UpdatePointPocketMarker(uint pointPockets)
+    public void _UpdatePointPocketMarker(uint pointPockets, bool callShotLock)
     {
 #if TKCH_DEBUG_POINT_POCKET_MARKER
-        table._LogInfo($"TKCH GraphicsManager::_UpdatePointPocketMarker( pointPockets = {pointPockets:X2})");
+        table._LogInfo($"TKCH GraphicsManager::_UpdatePointPocketMarker( pointPockets = {pointPockets:X2}, callShotLock = {callShotLock})");
 #endif
         for (int i = 0; i < table.pointPocketMarkers.Length; i++)
         {
-            table.pointPocketMarkers[i].SetActive((pointPockets & (0x1u << i)) != 0);
+            bool enable = (pointPockets & (0x1u << i)) != 0;
+            if (enable)
+            {
+                table.pointPocketMarkers[i].GetComponent<MeshRenderer>().material =
+                    (table.teamIdLocal ^ table.teamColorLocal) == 0 ? calledPocketBlue : calledPocketOrange;
+                table.pointPocketMarkerSphere[i].GetComponent<MeshRenderer>().material =
+                    (callShotLock ? calledPocketSphereWhite :
+                    (table.teamIdLocal ^ table.teamColorLocal) == 0 ? calledPocketSphereBlue : calledPocketSphereOrange);
+            }
+            table.pointPocketMarkers[i].SetActive(enable);
+        }
+
+#if TKCH_DEBUG_POINT_POCKET_MARKER
+        table._LogInfo($"  teamIdLocal = {table.teamIdLocal}, teamColorLocal = {table.teamColorLocal})");
+        table._LogInfo($"  (teamIdLocal ^ teamColorLocal) = {(table.teamIdLocal ^ table.teamColorLocal)}");
+#endif
+        table.transform.Find("intl.controls/callShotLock/render").GetComponent<MeshRenderer>().material =
+            (callShotLock ? calleShotLockWhite :
+                (table.teamIdLocal ^ table.teamColorLocal) == 0 ? calleShotLockBlue : calleShotLockOrange);
+    }
+
+    public void _DisablePointPocketMarker()
+    {
+        for (int i = 0; i < table.pointPocketMarkers.Length; i++)
+        {
+            table.pointPocketMarkers[i].SetActive(false);
         }
     }
 

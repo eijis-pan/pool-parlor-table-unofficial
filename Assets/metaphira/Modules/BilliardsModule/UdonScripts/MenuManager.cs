@@ -24,6 +24,9 @@ public class MenuManager : UdonSharpBehaviour
     [SerializeField] public UIButton button8Win;
     [SerializeField] public UIButton button5Win;
     [SerializeField] public UIButton button3Win;
+    [SerializeField] public UIButton button3WinVForm;
+    [SerializeField] public UIButton button3WinPentagon;
+    [SerializeField] public UIButton button3WinPlusDia;
     [SerializeField] public UIButton button8Ball;
     [SerializeField] public UIButton button9Ball;
     [SerializeField] public UIButton button4Ball;
@@ -35,6 +38,7 @@ public class MenuManager : UdonSharpBehaviour
     [SerializeField] public UIButton buttonTeamsToggle;
     [SerializeField] public UIButton buttonGuidelineToggle;
     [SerializeField] public UIButton buttonLockingToggle;
+    [SerializeField] public UIButton buttonBankToggle;
 
     [SerializeField] public UIButton buttonLeave;
     [SerializeField] public UIButton buttonPlay;
@@ -102,6 +106,9 @@ public class MenuManager : UdonSharpBehaviour
         button4Ball._ResetPushButton();
         button4BallJP._ResetPushButton();
         button4BallKR._ResetPushButton();
+        button3WinVForm._ResetPushButton();
+        button3WinPentagon._ResetPushButton();
+        button3WinPlusDia._ResetPushButton();
 
         switch (menuGameMode)
         {
@@ -109,38 +116,71 @@ public class MenuManager : UdonSharpBehaviour
                 button8Ball._SetButtonPushed();
                 button4BallJP.gameObject.SetActive(false);
                 button4BallKR.gameObject.SetActive(false);
+                button3WinVForm.gameObject.SetActive(false);
+                button3WinPentagon.gameObject.SetActive(false);
+                button3WinPlusDia.gameObject.SetActive(false);
                 break;
             case 1:
                 button9Ball._SetButtonPushed();
                 button4BallJP.gameObject.SetActive(false);
                 button4BallKR.gameObject.SetActive(false);
+                button3WinVForm.gameObject.SetActive(false);
+                button3WinPentagon.gameObject.SetActive(false);
+                button3WinPlusDia.gameObject.SetActive(false);
                 break;
             case 2:
                 button4Ball._SetButtonPushed();
                 button4BallJP._SetButtonPushed();
                 button4BallJP.gameObject.SetActive(true);
                 button4BallKR.gameObject.SetActive(true);
+                button3WinVForm.gameObject.SetActive(false);
+                button3WinPentagon.gameObject.SetActive(false);
+                button3WinPlusDia.gameObject.SetActive(false);
                 break;
             case 3:
                 button4Ball._SetButtonPushed();
                 button4BallKR._SetButtonPushed();
                 button4BallJP.gameObject.SetActive(true);
                 button4BallKR.gameObject.SetActive(true);
+                button3WinVForm.gameObject.SetActive(false);
+                button3WinPentagon.gameObject.SetActive(false);
+                button3WinPlusDia.gameObject.SetActive(false);
                 break;
             case BilliardsModule.GAME_MODE_ONEPOCKET15:
                 button8Win._SetButtonPushed();
                 button4BallJP.gameObject.SetActive(false);
                 button4BallKR.gameObject.SetActive(false);
+                button3WinVForm.gameObject.SetActive(false);
+                button3WinPentagon.gameObject.SetActive(false);
+                button3WinPlusDia.gameObject.SetActive(false);
                 break;
             case BilliardsModule.GAME_MODE_ONEPOCKET9:
                 button5Win._SetButtonPushed();
                 button4BallJP.gameObject.SetActive(false);
                 button4BallKR.gameObject.SetActive(false);
+                button3WinVForm.gameObject.SetActive(false);
+                button3WinPentagon.gameObject.SetActive(false);
+                button3WinPlusDia.gameObject.SetActive(false);
                 break;
             case BilliardsModule.GAME_MODE_ONEPOCKET5:
                 button3Win._SetButtonPushed();
                 button4BallJP.gameObject.SetActive(false);
                 button4BallKR.gameObject.SetActive(false);
+                button3WinVForm.gameObject.SetActive(true);
+                button3WinPentagon.gameObject.SetActive(true);
+                button3WinPlusDia.gameObject.SetActive(true);
+                if (table.rackFormLocal == BilliardsModule.RACK_MODE_5BALL_VFORM)
+                {
+                    button3WinVForm._SetButtonPushed();
+                }
+                else if (table.rackFormLocal == BilliardsModule.RACK_MODE_5BALL_PENTAGON)
+                {
+                    button3WinPentagon._SetButtonPushed();
+                }
+                else if (table.rackFormLocal == BilliardsModule.RACK_MODE_5BALL_PLUSDIA)
+                {
+                    button3WinPlusDia._SetButtonPushed();
+                }
                 break;
         }
     }
@@ -245,6 +285,18 @@ public class MenuManager : UdonSharpBehaviour
         buttonTeamsToggle._SetButtonToggle(table.teamsLocal);
         buttonGuidelineToggle._SetButtonToggle(!table.noGuidelineLocal);
         buttonLockingToggle._SetButtonToggle(!table.noLockingLocal);
+        buttonBankToggle._SetButtonToggle(!table.noBankLocal);
+
+        _RefreshPointPockets();
+
+        _RefreshPlayerList();
+    }
+
+    public void _RefreshPointPockets()
+    {
+#if TKCH_DEBUG_POINT_POCKET_MARKER
+        table._LogInfo("TKCH MenuManager::_RefreshPointPockets()");
+#endif
 
         //uint pockets = (table.targetPocketedLocal[1] & table.one_pocket_point_pocket_mask) >> 24;
         uint pockets = table.pointPocketsLocal;
@@ -259,9 +311,7 @@ public class MenuManager : UdonSharpBehaviour
 #endif
             buttonPocketToggles[i]._SetButtonToggle(toggle);
         }
-        table.graphicsManager._UpdatePointPocketMarker(pockets);
-
-        _RefreshPlayerList();
+        table.graphicsManager._UpdatePointPocketMarker(pockets, false);
     }
 
     public void _RefreshLobbyOpen()
@@ -270,6 +320,9 @@ public class MenuManager : UdonSharpBehaviour
         button8Win.disableInteractions = isNormalPlayer;
         button5Win.disableInteractions = isNormalPlayer;
         button3Win.disableInteractions = isNormalPlayer;
+        button3WinVForm.disableInteractions = isNormalPlayer;
+        button3WinPentagon.disableInteractions = isNormalPlayer;
+        button3WinPlusDia.disableInteractions = isNormalPlayer;
         button8Ball.disableInteractions = isNormalPlayer;
         button9Ball.disableInteractions = isNormalPlayer;
         button4Ball.disableInteractions = isNormalPlayer;
@@ -284,6 +337,7 @@ public class MenuManager : UdonSharpBehaviour
         buttonTeamsToggle.disableInteractions = isNormalPlayer;
         buttonGuidelineToggle.disableInteractions = isNormalPlayer;
         buttonLockingToggle.disableInteractions = isNormalPlayer;
+        buttonBankToggle.disableInteractions = isNormalPlayer;
         buttonTimerLeft.disableInteractions = isNormalPlayer;
         buttonTimerRight.disableInteractions = isNormalPlayer;
 
@@ -353,9 +407,18 @@ public class MenuManager : UdonSharpBehaviour
             {
                 table._TriggerGameModeChanged(BilliardsModule.GAME_MODE_ONEPOCKET9);
             }
-            else if (button.name == "3Win")
+            else if (button.name == "3Win" | button.name == "3WinVForm")
             {
                 table._TriggerGameModeChanged(BilliardsModule.GAME_MODE_ONEPOCKET5);
+                table._TriggerRackFromChanged(BilliardsModule.RACK_MODE_5BALL_VFORM);
+            }
+            else if (button.name == "3WinPentagon")
+            {
+                table._TriggerRackFromChanged(BilliardsModule.RACK_MODE_5BALL_PENTAGON);
+            }
+            else if (button.name == "3WinPlusDia")
+            {
+                table._TriggerRackFromChanged(BilliardsModule.RACK_MODE_5BALL_PLUSDIA);
             }
             else if (button.name.StartsWith("Pocket") && button.name.EndsWith("Toggle"))
             {
@@ -371,6 +434,10 @@ public class MenuManager : UdonSharpBehaviour
                         _RefreshToggleSettings();
                     }
                 }
+            }
+            else if (button.name == "BankToggle")
+            {
+                table._TriggerNoBankChanged(!button.toggleState);
             }
             else if (button.name == "TeamsToggle")
             {

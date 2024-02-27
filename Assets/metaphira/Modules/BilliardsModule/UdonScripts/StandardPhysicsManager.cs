@@ -1,4 +1,6 @@
-﻿//#define TKCH_DEBUG_CUSHION
+﻿#define TKCH_5BALL_HIDE8
+
+//#define TKCH_DEBUG_CUSHION
 
 using System;
 using UdonSharp;
@@ -144,6 +146,51 @@ public class StandardPhysicsManager : UdonSharpBehaviour
             }
             else
             {
+                if (!ReferenceEquals(null, Networking.LocalPlayer) && Networking.LocalPlayer.IsUserInVR())
+                {
+                    if (table.isOnePocket)
+                    {
+                        int onePocketKind = (int)(table.gameModeLocal & BilliardsModule.GAME_MODE_ONEPOCKET_MASK);
+                        //uint onePocketMask = table.one_pocket_masks[onePocketKind];
+                        int ballCount = table.one_pocket_balls[onePocketKind];
+                        bool hit = false;
+                        for (int k = 0; k < ballCount; k++)
+                        {
+#if TKCH_5BALL_HIDE8
+                            int i = k + (table.isOnePocket5Ball ? 2 : 1);
+#else
+                            int i = k + 1;
+#endif
+                            if ((lpos2 - balls_P[i]).sqrMagnitude < k_BALL_RSQR)
+                            {
+                                table._TriggerOtherBallHit(i, false);
+                                hit = true;
+                                break;
+                            }
+                        }
+                        if (!hit)
+                        {
+                            table._TriggerOtherBallHit(-1, false);
+                        }
+                        
+                        hit = false;
+                        for (int i = 0; i < table.pcketLocations.Length; i++)
+                        {
+                            // k_INNER_RADIUS = 0.072
+                            if ((lpos2 - table.pcketLocations[i]).sqrMagnitude < 0.016f)
+                            {
+                                table._TriggerPocketHit(i, false);
+                                hit = true;
+                                break;
+                            }
+                        }
+                        if (!hit)
+                        {
+                            table._TriggerPocketHit(-1, false);
+                        }
+                    }
+                }
+                
                 cue_vdir = this.transform.InverseTransformVector(cuetip.transform.forward);//new Vector2( cuetip.transform.forward.z, -cuetip.transform.forward.x ).normalized;
 
                 // Get where the cue will strike the ball
@@ -619,7 +666,11 @@ public class StandardPhysicsManager : UdonSharpBehaviour
         }
         else if (table.isOnePocket5Ball)
         {
+#if TKCH_5BALL_HIDE8
             for (int i = 2; i <= 6; i++)
+#else
+            for (int i = 1; i <= 5; i++)
+#endif
             {
                 if ((balls_P[0] - balls_P[i]).sqrMagnitude < k_BALL_DSQR)
                 {
@@ -656,7 +707,7 @@ public class StandardPhysicsManager : UdonSharpBehaviour
     const float k_F = 1.72909790282f;
 
     // Apply cushion bounce
-    void _phy_bounce_cushion(int id, Vector3 N)
+    void _phy_bounce_cushion(int id, Vector3 N, int cushion)
     {
         // Mathematical expressions derived from: https://billiards.colostate.edu/physics_articles/Mathavan_IMechE_2010.pdf
         //
@@ -693,9 +744,9 @@ public class StandardPhysicsManager : UdonSharpBehaviour
         if (Vector3.Dot(source_v, N) > 0.0f)
         {
 #if TKCH_DEBUG_CUSHION
-            table._TriggerCushion(id, balls_P[id], true);
+            table._TriggerCushion(id, balls_P[id], cushion, true);
 #else
-            table._TriggerCushion(id, balls_P[id]);
+            table._TriggerCushion(id, balls_P[id], cushion);
 #endif
             return;
         }
@@ -743,9 +794,9 @@ public class StandardPhysicsManager : UdonSharpBehaviour
         balls_W[id] += rb * W1;
         
 #if TKCH_DEBUG_CUSHION
-        table._TriggerCushion(id, balls_P[id], false);
+        table._TriggerCushion(id, balls_P[id], cushion, false);
 #else
-        table._TriggerCushion(id, balls_P[id]);
+        table._TriggerCushion(id, balls_P[id], cushion);
 #endif
     }
 
@@ -935,13 +986,13 @@ public class StandardPhysicsManager : UdonSharpBehaviour
         if (A.x * zx > k_pR.x)
         {
             balls_P[id].x = k_pR.x * zx;
-            _phy_bounce_cushion(id, Vector3.left * zx);
+            _phy_bounce_cushion(id, Vector3.left * zx, -1);
         }
 
         if (A.z * zz > k_pO.z)
         {
             balls_P[id].z = k_pO.z * zz;
-            _phy_bounce_cushion(id, Vector3.back * zz);
+            _phy_bounce_cushion(id, Vector3.back * zz, -1);
         }
     }
 
@@ -1002,7 +1053,7 @@ public class StandardPhysicsManager : UdonSharpBehaviour
                         A.x = k_TABLE_WIDTH - k_CUSHION_RADIUS;
 
                         // Dynamic
-                        _phy_bounce_cushion(id, Vector3.Scale(k_vC_vW_normal, _sign_pos));
+                        _phy_bounce_cushion(id, Vector3.Scale(k_vC_vW_normal, _sign_pos), (0 < _sign_pos.x ? 0 : 1));   // 短クッション フット側0:0001 キッチン側1:0010
                     }
                 }
                 else
@@ -1023,7 +1074,7 @@ public class StandardPhysicsManager : UdonSharpBehaviour
                             A = k_vC + N * k_CUSHION_RADIUS;
 
                             // Dynamic
-                            _phy_bounce_cushion(id, Vector3.Scale(N, _sign_pos));
+                            _phy_bounce_cushion(id, Vector3.Scale(N, _sign_pos), -5);
                         }
                     }
                     else
@@ -1042,7 +1093,7 @@ public class StandardPhysicsManager : UdonSharpBehaviour
                             A = k_pQ + dot * k_vB_vY;
 
                             // Dynamic
-                            _phy_bounce_cushion(id, Vector3.Scale(k_vC_vZ_normal, _sign_pos));
+                            _phy_bounce_cushion(id, Vector3.Scale(k_vC_vZ_normal, _sign_pos), -2);   // 0x004u コーナーポケット短側クッション
                         }
                     }
                 }
@@ -1077,7 +1128,7 @@ public class StandardPhysicsManager : UdonSharpBehaviour
                                 A = k_pL + dot * k_vA_vD;
 
                                 // Dynamic
-                                _phy_bounce_cushion(id, Vector3.Scale(k_vA_vD_normal, _sign_pos));
+                                _phy_bounce_cushion(id, Vector3.Scale(k_vA_vD_normal, _sign_pos), -3);
                             }
                             else
                             {
@@ -1085,7 +1136,7 @@ public class StandardPhysicsManager : UdonSharpBehaviour
                                 A.z = k_pN.z;
 
                                 // Dynamic
-                                _phy_bounce_cushion(id, Vector3.Scale(k_vA_vB_normal, _sign_pos));
+                                _phy_bounce_cushion(id, Vector3.Scale(k_vA_vB_normal, _sign_pos), -4);
                             }
                         }
                         else
@@ -1094,7 +1145,7 @@ public class StandardPhysicsManager : UdonSharpBehaviour
                             A.z = k_pN.z;
 
                             // Dynamic
-                            _phy_bounce_cushion(id, Vector3.Scale(k_vA_vB_normal, _sign_pos));
+                            _phy_bounce_cushion(id, Vector3.Scale(k_vA_vB_normal, _sign_pos), (0 < _sign_pos.z ? 2 : 3));   // 長クッション 上2:0100 下3:1000
                         }
                     }
                 }
@@ -1116,7 +1167,7 @@ public class StandardPhysicsManager : UdonSharpBehaviour
                             A = k_vB + N * k_CUSHION_RADIUS;
 
                             // Dynamic
-                            _phy_bounce_cushion(id, Vector3.Scale(N, _sign_pos));
+                            _phy_bounce_cushion(id, Vector3.Scale(N, _sign_pos), -6);
                         }
                     }
                     else
@@ -1135,7 +1186,7 @@ public class StandardPhysicsManager : UdonSharpBehaviour
                             A = k_pP + dot * k_vB_vY;
 
                             // Dynamic
-                            _phy_bounce_cushion(id, Vector3.Scale(k_vB_vY_normal, _sign_pos));
+                            _phy_bounce_cushion(id, Vector3.Scale(k_vB_vY_normal, _sign_pos), -7);   // 0x080u コーナーポケット長側クッション
                         }
                     }
                 }
@@ -1163,7 +1214,7 @@ public class StandardPhysicsManager : UdonSharpBehaviour
                             A.x = k_pK.x;
 
                             // Dynamic
-                            _phy_bounce_cushion(id, Vector3.Scale(k_vC_vW_normal, _sign_pos));
+                            _phy_bounce_cushion(id, Vector3.Scale(k_vC_vW_normal, _sign_pos), -8);
                         }
                     }
                     else
@@ -1180,7 +1231,7 @@ public class StandardPhysicsManager : UdonSharpBehaviour
                             A = k_vD + N * k_CUSHION_RADIUS;
 
                             // Dynamic
-                            _phy_bounce_cushion(id, Vector3.Scale(N, _sign_pos));
+                            _phy_bounce_cushion(id, Vector3.Scale(N, _sign_pos), -9);
                         }
                     }
                 }
@@ -1201,7 +1252,7 @@ public class StandardPhysicsManager : UdonSharpBehaviour
                         A = k_pL + dot * k_vA_vD;
 
                         // Dynamic
-                        _phy_bounce_cushion(id, Vector3.Scale(k_vA_vD_normal, _sign_pos));
+                        _phy_bounce_cushion(id, Vector3.Scale(k_vA_vD_normal, _sign_pos), -10);   // 0x400u サイドポケットキッチン側クッション
                     }
                 }
             }
@@ -1219,7 +1270,7 @@ public class StandardPhysicsManager : UdonSharpBehaviour
                     A = k_vA + N * k_CUSHION_RADIUS;
 
                     // Dynamic
-                    _phy_bounce_cushion(id, Vector3.Scale(N, _sign_pos));
+                    _phy_bounce_cushion(id, Vector3.Scale(N, _sign_pos), -11);   // 0x800u サイドポケットフット側クッション
                 }
             }
         }

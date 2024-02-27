@@ -1,4 +1,6 @@
-﻿
+﻿#define TKCH_5BALL_HIDE8
+
+using System;
 using Metaphira.Modules.CameraOverride;
 using UdonSharp;
 using UnityEngine;
@@ -237,6 +239,7 @@ public class DesktopManager : UdonSharpBehaviour
                 renderCuePosition(shotDirection);
                 updateSpinIndicator();
                 updateJumpIndicator();
+                updateCallShotIndicator();
             }
         }
 
@@ -299,6 +302,158 @@ public class DesktopManager : UdonSharpBehaviour
         jumpAngle = Mathf.Clamp(jumpAngle, 0, Mathf.PI / 2);
 
         jumpIndicator.transform.localPosition = new Vector3(-Mathf.Cos(jumpAngle) * 1.1f, 0, Mathf.Sin(jumpAngle) * 1.1f);
+    }
+
+    private int[] pocketOrder = new[] { 0, 1, 5, 3, 2, 4 };
+
+    private int nextPocketOrder(bool asc)
+    {
+        uint pockets = table.pointPocketsLocal;
+        int pocketCount = table.pcketLocations.Length;
+        int id = (asc ? 0 : pocketOrder[pocketOrder.Length - 1]);
+        for (int i = 0; i < pocketCount; i++)
+        {
+            if (((pockets >> i) & 0x1u) != 0)
+            {
+                int current = Array.IndexOf(pocketOrder, i);
+                int next = current + (asc ? 1 : -1);
+                if (next < 0 || pocketCount <= next)
+                {
+                    id = i;
+                    break;
+                }
+
+                id = pocketOrder[next];
+                break;
+            }
+        }
+
+        return id;
+    }
+
+    private int[][] ballOrder = new[]
+    {
+        new[] { 0, 2, 3, 4, 5, 6, 7, 8, 1, 9, 10, 11, 12, 13, 14, 15 }, 
+        new[] { 0, 2, 3, 4, 5, 6, 7, 8, 1, 9 },
+#if TKCH_5BALL_HIDE8
+        new[] { 0, 2, 3, 4, 5, 6 }
+#else
+        new[] { 0, 2, 3, 4, 5, 1 }
+#endif
+    };
+
+    private int nextBallOrder(bool asc)
+    {
+        int onePocketKind = (int)(table.gameModeLocal & BilliardsModule.GAME_MODE_ONEPOCKET_MASK);
+        int ballCount = table.one_pocket_balls[onePocketKind];
+        int id = (asc ? 2 : ballOrder[onePocketKind][ballOrder[onePocketKind].Length - 1]);
+        int orig = id;
+        uint calledBalls = table.calledBallsLocal;
+        uint ballsPocketed = table.ballsPocketedLocal;
+        for (int k = 0; k < ballCount; k++)
+        {
+#if TKCH_5BALL_HIDE8
+            int i = k + (table.isOnePocket5Ball ? 2 : 1);
+#else
+            int i = k + 1;
+#endif
+            if (((calledBalls >> i) & 0x1u) != 0)
+            {
+                int current = Array.IndexOf(ballOrder[onePocketKind], i);
+                int next = current + (asc ? 1 : -1);
+                if (next < 1 || ballCount < next)
+                {
+                    id = i;
+                    break;
+                }
+
+                id = ballOrder[onePocketKind][next];
+                break;
+            }
+        }
+
+        for (int k = 0; k < ballCount; k++)
+        {
+            if (((ballsPocketed >> id) & 0x1u) == 0)
+            {
+                break;
+            }
+            
+            int current = Array.IndexOf(ballOrder[onePocketKind], id);
+            int next = current + (asc ? 1 : -1);
+            if (next < 1 || ballCount < next)
+            {
+                id = orig;
+                break;
+            }
+            id = ballOrder[onePocketKind][next];
+        }    
+        
+        return id;
+    }
+
+    private void updateCallShotIndicator()
+    {
+        if (Input.GetKeyDown(KeyCode.P))
+        { 
+            /*
+            int[] pocketNextOrder = new[] { 1, 5, 4, 2, 0, 3 };
+            int id = 0;
+            uint pockets = table.pointPocketsLocal;
+            for (int i = 0; i < 6; i++)
+            {
+                if (((pockets >> i) & 0x1u) != 0)
+                {
+                    id = pocketNextOrder[i];
+                    if (id == 0)
+                    {
+                        id = i;
+                    }
+                    break;
+                }
+            }
+            */
+            int id = nextPocketOrder(!(Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)));
+            table._TriggerPocketHit(id, true);
+        }
+        if (Input.GetKeyDown(KeyCode.B))
+        {
+            /*
+            int[][] ballNextOrder = new[]
+            {
+                new[] { 2, 9, 3, 4, 5, 6, 7, 8, 1, 10, 11, 12, 13, 14, 15, 2 }, 
+                new[] { 2, 9, 3, 4, 5, 6, 7, 8, 1, 2 },
+                new[] { 2, 2, 3, 4, 5, 1 }
+            };
+            int onePocketKind = (int)(table.gameModeLocal & BilliardsModule.GAME_MODE_ONEPOCKET_MASK);
+            int ballCount = table.one_pocket_balls[onePocketKind];
+            int id = 2;
+            uint calledBalls = table.calledBallsLocal;
+            for (int i = 1; i <= ballCount; i++)
+            {
+                if (((calledBalls >> i) & 0x1u) != 0)
+                {
+                    id = ballNextOrder[onePocketKind][i];
+                    if (id == 2)
+                    {
+                        id = i;
+                    }
+                    break;
+                }
+            }
+            uint ballsPocketed = table.ballsPocketedLocal;
+            for (int i = 1; i < ballNextOrder[onePocketKind].Length; i++)
+            {
+                if (((ballsPocketed >> id) & 0x1u) == 0)
+                {
+                    break;
+                }
+                id = ballNextOrder[onePocketKind][id];
+            }
+            */
+            int id = nextBallOrder(!(Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)));
+            table._TriggerOtherBallHit(id, true);
+        }
     }
 
     private void renderCuePosition(Vector3 dir)

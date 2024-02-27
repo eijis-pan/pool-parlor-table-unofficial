@@ -1,9 +1,12 @@
 ﻿#define TKCH_ONEPOCKET_SCORE
+#define TKCH_CONFLICT_BANKPOOL_ONEPOCKET
 
 //#define TKCH_DEBUG_GAMEMODE
 //#define TKCH_DEBUG_POINT_POCKET_MARKER
+//#define TKCH_DEBUG_CALLED_BALL_MARKER
 //#define TKCH_DEBUG_UNDO
 //#define TKCH_DEBUG_SAVELOAD
+//#define TKCH_DEBUG_5BALL
 
 using System;
 using UdonSharp;
@@ -45,6 +48,7 @@ public class NetworkingManager : UdonSharpBehaviour
     [UdonSynced] [NonSerialized] public uint denyBallsSynced;
     [UdonSynced] [NonSerialized] public uint pocketedRackSynced;
     [UdonSynced] [NonSerialized] public uint pointPocketsSynced;
+    [UdonSynced] [NonSerialized] public uint calledBallsSynced;
 
     // the current team which is playing
     [UdonSynced] [NonSerialized] public byte teamIdSynced;
@@ -77,6 +81,8 @@ public class NetworkingManager : UdonSharpBehaviour
     // additional one pocket game (4 is 15balls8win, 5 is 9balls5win, 6 is 5balls3win)
     [UdonSynced] [NonSerialized] public byte gameModeSynced;
 
+    [UdonSynced] [NonSerialized] public byte rackFormSynced;
+
     // the timer for the current game in seconds
     [UdonSynced] [NonSerialized] public uint timerSynced;
 
@@ -89,6 +95,9 @@ public class NetworkingManager : UdonSharpBehaviour
     // whether or not the cue can be locked
     [UdonSynced] [NonSerialized] public bool noLockingSynced;
 
+    [UdonSynced] [NonSerialized] public bool noBankSynced;
+    [UdonSynced] [NonSerialized] public bool callShotLockSynced;
+
     // scores if game state is 2 or 3 (4ball)      and OnePocket points
     [UdonSynced] [NonSerialized] public int[] fourBallScoresSynced = new int[2];
 
@@ -99,7 +108,6 @@ public class NetworkingManager : UdonSharpBehaviour
 
     // whether this update is urgent and should interrupt any local simulations (0 is no, 1 is interrupt, 2 is interrupt and halt)
     [UdonSynced] [NonSerialized] public byte isUrgentSynced;
-    [UdonSynced] [NonSerialized] public bool noCushionSynced;
 
     // the current tournament referee
     [UdonSynced] [NonSerialized] public string tournamentRefereeSynced;
@@ -112,6 +120,8 @@ public class NetworkingManager : UdonSharpBehaviour
 
     // the current table skin
     [UdonSynced] [NonSerialized] public byte tableSkinSynced;
+
+    [UdonSynced] [NonSerialized] public bool noCushionSynced;
 
     [SerializeField] private PlayerSlot[] playerSlots;
     
@@ -292,6 +302,9 @@ public class NetworkingManager : UdonSharpBehaviour
         turnStateSynced = 0;
         timerStartSynced = Networking.GetServerTimeInMilliseconds();
         swapFourBallCueBalls();
+        calledBallsSynced = 0;
+        pointPocketsSynced = 0;
+        callShotLockSynced = false;
 
         bufferMessages(false);
     }
@@ -305,6 +318,9 @@ public class NetworkingManager : UdonSharpBehaviour
         timerStartSynced = Networking.GetServerTimeInMilliseconds();
         repositionStateSynced = (byte)(reposition ? 2 : 0);
         swapFourBallCueBalls();
+        calledBallsSynced = 0;
+        pointPocketsSynced = 0;
+        callShotLockSynced = false;
 
         bufferMessages(false);
     }
@@ -315,6 +331,9 @@ public class NetworkingManager : UdonSharpBehaviour
 
         turnStateSynced = 0;
         timerStartSynced = Networking.GetServerTimeInMilliseconds();
+        calledBallsSynced = 0;
+        pointPocketsSynced = 0;
+        callShotLockSynced = false;
 
         bufferMessages(false);
     }
@@ -392,6 +411,16 @@ public class NetworkingManager : UdonSharpBehaviour
 
     public void _OnGameStart(uint defaultBallsPocketed, Vector3[] ballPositions)
     {
+#if TKCH_DEBUG_5BALL
+        table._LogInfo($"TKCH NetworkingManager::_OnGameStart(defaultBallsPocketed = {defaultBallsPocketed:X4})");
+        table._LogInfo($"  rackFormSynced = {rackFormSynced}");
+        table._LogInfo($"  Vector3[] ballPositions [ {ballPositions.Length} ]");
+        for (int i = 0; i < 8; i++)
+        {
+            table._LogInfo($"  {i} = {ballPositions[i].x}, {ballPositions[i].y}, {ballPositions[i].z}");
+        }
+#endif
+
         stateIdSynced++;
 
         gameStateSynced = 2;
@@ -417,6 +446,10 @@ public class NetworkingManager : UdonSharpBehaviour
             onePocketNotYetUponSynced = 0;
             isTableOpenSynced = false;
             teamColorSynced = (byte)(teamIdSynced ^ 0x1u);
+#if TKCH_CONFLICT_BANKPOOL_ONEPOCKET
+            pointPocketsSynced = 0;
+#endif
+            calledBallsSynced = 0;
         }
         
         bufferMessages(false);
@@ -444,6 +477,33 @@ public class NetworkingManager : UdonSharpBehaviour
         playerSlots[playerId]._Reset();
     }
 
+    public void _OnCalledBallChanged(bool enabled, uint id)
+    {
+#if TKCH_DEBUG_CALLED_BALL_MARKER
+        table._LogInfo($"TKCH NetworkingManager::_OnCalledBallChanged( pocketEnabled = {enabled}, id = {id})");
+#endif
+        uint ball_bit = 0x1u << (int)id;
+        uint calledBalls = calledBallsSynced;
+        if (enabled)
+        {
+            calledBalls = ball_bit;
+        }
+        else
+        {
+            calledBalls = 0;
+        }
+#if TKCH_DEBUG_CALLED_BALL_MARKER
+        table._LogInfo($"  calledBalls = {calledBalls:X4}");
+#endif
+
+        calledBallsSynced = calledBalls;
+#if TKCH_DEBUG_CALLED_BALL_MARKER
+        table._LogInfo($"  calledBallsSynced = {calledBallsSynced:X4} changed");
+#endif
+        
+        bufferMessages(false);
+    }
+
     public bool _OnPocketChanged(bool pocketEnabled, uint pocket)
     {
 #if TKCH_DEBUG_POINT_POCKET_MARKER
@@ -454,18 +514,30 @@ public class NetworkingManager : UdonSharpBehaviour
         uint pointPockets = pointPocketsSynced;
         if (pocketEnabled)
         {
+#if TKCH_CONFLICT_BANKPOOL_ONEPOCKET
+            pointPockets = pocketBit;
+#else
             pointPockets |= pocketBit;
+#endif
         }
         else
         {
+#if TKCH_CONFLICT_BANKPOOL_ONEPOCKET
+            pointPockets = 0;
+#else
             pointPockets &= ~(pocketBit);
+#endif
         }
 #if TKCH_DEBUG_POINT_POCKET_MARKER
         table._LogInfo($"  pointPockets = {pointPockets:X2}");
 #endif
 
         bool result = true;
+#if TKCH_CONFLICT_BANKPOOL_ONEPOCKET
+        if (true)
+#else
         if ((pointPockets & 0x15u) != 0 && (pointPockets & 0x2Au) != 0)
+#endif
         {
             pointPocketsSynced = pointPockets;
             /*
@@ -496,6 +568,20 @@ public class NetworkingManager : UdonSharpBehaviour
         
         bufferMessages(false);
         return result;
+    }
+
+    public void _OnNoBankChanged(bool noBankEnabled)
+    {
+        noBankSynced = noBankEnabled;
+
+        bufferMessages(false);
+    }
+    
+    public void _OnCallShotLockChanged(bool callShotLockEnabled)
+    {
+        callShotLockSynced = callShotLockEnabled;
+
+        bufferMessages(false);
     }
 
     public void _OnTeamsChanged(bool teamsEnabled)
@@ -540,6 +626,13 @@ public class NetworkingManager : UdonSharpBehaviour
         bufferMessages(false);
     }
 
+    public void _OnRackFormChanged(uint newRackForm)
+    {
+        rackFormSynced = (byte)newRackForm;
+
+        bufferMessages(false);
+    }
+
     public void _ForceLoadFromState
     (
         int stateIdLocal,
@@ -547,6 +640,7 @@ public class NetworkingManager : UdonSharpBehaviour
         byte turnStateLocal, Vector3 cueBallV, Vector3 cueBallW, byte previewWinningTeam, 
         uint targetPocketed, uint otherPocketed, uint denyBalls, uint pocketedRack, byte newOnePocketNotYetUpon
         //, uint[] newScoreSyncRows
+        , byte pointPockets, uint calledBalls, byte rackForm
     )
     {
 #if TKCH_DEBUG_UNDO
@@ -571,6 +665,7 @@ public class NetworkingManager : UdonSharpBehaviour
         Array.Copy(newScores, fourBallScoresSynced, 2);
         onePocketNotYetUponSynced = newOnePocketNotYetUpon;
         gameModeSynced = (byte)gameMode;
+        rackFormSynced = (byte)rackForm;
         teamIdSynced = (byte)teamId;
         repositionStateSynced = (byte) repositionState;
         isTableOpenSynced = isTableOpen;
@@ -583,6 +678,8 @@ public class NetworkingManager : UdonSharpBehaviour
         simulationOwnerSynced = Networking.LocalPlayer.displayName;
         previewWinningTeamSynced = previewWinningTeam;
         //scoreSyncRows = newScoreSyncRows;
+        pointPocketsSynced = pointPockets;
+        calledBallsSynced = calledBalls;
 
         table.UpdateScoreSyncRowsByParams(teamIdSynced, fourBallScoresSynced, onePocketNotYetUponSynced);
 
@@ -740,9 +837,9 @@ public class NetworkingManager : UdonSharpBehaviour
 
     public void _OnLoadGameState(string gameStateStr)
     {
-        if (gameStateStr.StartsWith("v2op:"))
+        if (gameStateStr.StartsWith("v2bp:"))
         {
-            onLoadGameStateV2op(gameStateStr.Substring(5));
+            onLoadGameStateV2bp(gameStateStr.Substring(5));
         }
         else if (gameStateStr.StartsWith("v2:"))
         {
@@ -847,16 +944,16 @@ public class NetworkingManager : UdonSharpBehaviour
         bufferMessages(true);
     }
 
-    private void onLoadGameStateV2op(string gameStateStr)
+    private void onLoadGameStateV2bp(string gameStateStr)
     {
 #if TKCH_DEBUG_SAVELOAD
-        table._LogInfo("TKCH NetworkingManager::onLoadGameStateV2op()");
+        table._LogInfo("TKCH NetworkingManager::onLoadGameStateV2bp()");
 #endif
 
         if (!isValidBase64(gameStateStr)) return;
 
         byte[] gameState = Convert.FromBase64String(gameStateStr);
-        if (gameState.Length != 0x86) return;
+        if (gameState.Length != 0x88) return;
 
 #if TKCH_DEBUG_SAVELOAD
         table._LogInfo($"  gameState.Length = {gameState.Length}");
@@ -901,16 +998,14 @@ public class NetworkingManager : UdonSharpBehaviour
             fourBallScoresSynced[i] = point;
         }
         fourBallCueBallSynced = gameState[0x79];
-        //targetPocketedSynced[0] = decodeU32(gameState, 0x7A);
         targetPocketedSynced = decodeU32(gameState, 0x7A);
-        //targetPocketedSynced[1] = decodeU16(gameState, 0x7E);
         otherPocketedSynced = decodeU16(gameState, 0x7E);
         denyBallsSynced = decodeU16(gameState, 0x80);
         pocketedRackSynced = decodeU16(gameState, 0x82);
         onePocketNotYetUponSynced = gameState[0x84];
         pointPocketsSynced = gameState[0x85];
-        //scoreSyncRows[0] = decodeU32(gameState, 0x86);
-        //scoreSyncRows[1] = decodeU32(gameState, 0x8A);
+        //calledBallsSynced = gameState[0x86];
+        calledBallsSynced = decodeU16(gameState, 0x86);
 
 #if TKCH_DEBUG_SAVELOAD || TKCH_DEBUG_UNDO
         table._LogInfo($"  ballsPocketedSynced = {ballsPocketedSynced:X4}");
@@ -920,6 +1015,7 @@ public class NetworkingManager : UdonSharpBehaviour
         table._LogInfo($"  points orange = {fourBallScoresSynced[0]}, blue = {fourBallScoresSynced[1]}");
         table._LogInfo($"  onePocketNotYetUponSynced = {onePocketNotYetUponSynced}");
         //table._LogInfo($"  scoreSyncRows = {scoreSyncRows[0]:X8}-{scoreSyncRows[1]:X8}");
+        table._LogInfo($"  calledBallsSynced = {calledBallsSynced:X4}");
 #endif
         
         table.UpdateScoreSyncRowsByParams(teamIdSynced, fourBallScoresSynced, onePocketNotYetUponSynced);
@@ -940,8 +1036,9 @@ public class NetworkingManager : UdonSharpBehaviour
         //table._LogInfo($"  scoreSyncRows = {scoreSyncRows[0]:X8}-{scoreSyncRows[1]:X8}");
         //table._LogInfo($"  scoreSyncRows = {(ReferenceEquals(null, scoreSyncRows) ? 'x' : 'o')}");
         //table._LogInfo($"  scoreSyncRows.length = {scoreSyncRows.Length}");
+        table._LogInfo($"  calledBallsSynced = {calledBallsSynced:X4}");
 #endif
-        byte[] gameState = new byte[0x86];
+        byte[] gameState = new byte[0x88];
         for (int i = 0; i < 16; i++)
         {
             encodeVec3Full(gameState, i * 6, ballsPSynced[i], 2.5f);
@@ -967,10 +1064,10 @@ public class NetworkingManager : UdonSharpBehaviour
         encodeU16(gameState, 0x82, (ushort) (pocketedRackSynced & 0xFFFFu));
         gameState[0x84] = (byte)onePocketNotYetUponSynced;
         gameState[0x85] = (byte)pointPocketsSynced;
-        //encodeU32(gameState, 0x86, scoreSyncRows[0]);
-        //encodeU32(gameState, 0x8A, scoreSyncRows[1]);
+        //gameState[0x86] = (byte)calledBallsSynced;
+        encodeU16(gameState, 0x86, (ushort) (calledBallsSynced & 0xFFFFu));
 
-        return "v2op:" + Convert.ToBase64String(gameState, Base64FormattingOptions.None);
+        return "v2bp:" + Convert.ToBase64String(gameState, Base64FormattingOptions.None);
     }
 
     // because udon won't let us try/catch
