@@ -264,6 +264,7 @@ public class BilliardsModule : UdonSharpBehaviour
         currentPhysicsManager.SendCustomEvent("_InitConstants");
 
         physicsModeLocal = 1;
+        networkingManager.physicsModeSynced = 1;
 
 
 #if HT8B_DEBUGGER
