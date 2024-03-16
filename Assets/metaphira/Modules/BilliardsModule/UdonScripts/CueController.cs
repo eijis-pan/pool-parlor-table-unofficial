@@ -71,7 +71,9 @@ public class CueController : UdonSharpBehaviour
 
     public override void OnDeserialization()
     {
-        string owner = Networking.GetOwner(this.gameObject).displayName;
+        VRCPlayerApi currentOwner = Networking.GetOwner(this.gameObject);
+        if (currentOwner == null) return;
+        string owner = currentOwner.displayName;
 
         activeCueSkin = table._CanUseCueSkin(owner, syncedCueSkin) ? syncedCueSkin : 0;
 

@@ -453,7 +453,8 @@ public class BilliardsModule : UdonSharpBehaviour
 
     public void _OnDropCue()
     {
-        if (!Networking.LocalPlayer.IsUserInVR()) desktopManager._OnDropCue();
+        VRCPlayerApi localPlayer = Networking.LocalPlayer;
+        if (localPlayer != null && !localPlayer.IsUserInVR()) desktopManager._OnDropCue();
     }
 
     public void _TriggerOnPlayerPrepareShoot()
