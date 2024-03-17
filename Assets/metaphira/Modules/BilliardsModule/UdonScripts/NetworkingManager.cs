@@ -485,7 +485,8 @@ public class NetworkingManager : UdonSharpBehaviour
 
     private void swapFourBallCueBalls()
     {
-        if (gameModeSynced != 2 && gameModeSynced != 3) return;
+        if (gameModeSynced != 2 && gameModeSynced != 3 && 
+            gameModeSynced != 4 && gameModeSynced != 5 && gameModeSynced != 6) return;
 
         fourBallCueBallSynced ^= 0x01;
         

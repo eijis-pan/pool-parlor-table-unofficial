@@ -13,6 +13,9 @@ public class GraphicsManager : UdonSharpBehaviour
     [SerializeField] Mesh fourBallMeshPlus;
     [SerializeField] Mesh fourBallMeshMinus;
 
+    [Header("Carom")]
+    [SerializeField] GameObject[] caromCushionTouch;
+
     [Header("Text")]
     [SerializeField] GameObject scorecardHolder;
     [SerializeField] Text[] playerNames;
@@ -48,6 +51,9 @@ public class GraphicsManager : UdonSharpBehaviour
 
     private bool fourBallPointActive;
     private float fourBallPointTime;
+
+    private bool[] caromCushionTouchActive;
+    private float[] caromCushionTouchTime;
 
     private float introAnimationTime = 0.0f;
 
@@ -106,6 +112,14 @@ public class GraphicsManager : UdonSharpBehaviour
             meshOverrideRegular[i + 1] = balls[13 + i].GetComponent<MeshFilter>().sharedMesh;
         }
 
+        caromCushionTouchActive = new bool[caromCushionTouch.Length];
+        caromCushionTouchTime = new float[caromCushionTouch.Length];
+        for (int i = 0; i < caromCushionTouch.Length; i++)
+        {
+            caromCushionTouchActive[i] = false;
+            caromCushionTouchTime[i] = 0;
+        }
+
         _DisableObjects();
     }
 
@@ -123,6 +137,7 @@ public class GraphicsManager : UdonSharpBehaviour
     {
         tickBallPositions();
         tickFourBallPoint();
+        tickCaromCushionTouch();
         tickIntroAnimation();
         tickTableColor();
         tickLobbyStatus();
@@ -175,6 +190,41 @@ public class GraphicsManager : UdonSharpBehaviour
         {
             fourBallPointActive = false;
             fourBallPoint.SetActive(false);
+        }
+    }
+
+    private void tickCaromCushionTouch()
+    {
+        for (int i = 0; i < caromCushionTouch.Length; i++)
+        {
+            if (!caromCushionTouchActive[i]) continue;
+
+            // Evaluate time
+            caromCushionTouchTime[i] += Time.deltaTime * 0.25f;
+
+            // Sustained step
+            float s = Mathf.Max(caromCushionTouchTime[i] - 0.1f, 0.0f);
+            float v = Mathf.Min(caromCushionTouchTime[i] * caromCushionTouchTime[i] * 100.0f, 21.0f * s * Mathf.Exp(-15.0f * s));
+
+            // Exponential step
+            float e = Mathf.Exp(-17.0f * Mathf.Pow(Mathf.Max(caromCushionTouchTime[i] - 1.2f, 0.0f), 3.0f));
+
+            float scale = e * v * 2.0f;
+
+            // Set scale
+            caromCushionTouch[i].transform.localScale = new Vector3(scale, scale, scale);
+
+            // Set position
+            Vector3 temp = caromCushionTouch[i].transform.localPosition;
+            temp.y = caromCushionTouchTime[i] * 0.5f;
+            caromCushionTouch[i].transform.localPosition = temp;
+
+            // Particle death
+            if (caromCushionTouchTime[i] > 2.0f)
+            {
+                caromCushionTouchActive[i] = false;
+                caromCushionTouch[i].SetActive(false);
+            }
         }
     }
 
@@ -412,6 +462,19 @@ public class GraphicsManager : UdonSharpBehaviour
         fourBallPoint.transform.LookAt(Networking.LocalPlayer.GetPosition());
     }
 
+    public void _SpawnCushionTouch(Vector3 pos, int color)
+    {
+        if (color < 0 || caromCushionTouch.Length <= color) return;
+        
+        caromCushionTouch[color].SetActive(true);
+        caromCushionTouchActive[color] = true;
+        caromCushionTouchTime[color] = 0.1f;
+
+        caromCushionTouch[color].transform.localPosition = pos;
+        caromCushionTouch[color].transform.localScale = Vector3.zero;
+        caromCushionTouch[color].transform.LookAt(Networking.LocalPlayer.GetPosition());
+    }
+
     public void _FlashTableLight()
     {
         tableCurrentColour *= 1.9f;
@@ -638,7 +701,7 @@ int uniform_cue_colour;
             table.balls[0].SetActive(true);
             table.balls[13].SetActive(true);
             table.balls[14].SetActive(true);
-            table.balls[15].SetActive(true);
+            table.balls[15].SetActive(!table.is3Cusion && !table.is2Cusion && !table.is1Cusion);
         }
         else
         {
@@ -747,6 +810,10 @@ int uniform_cue_colour;
         scorecardHolder.SetActive(false);
         table.marker9ball.SetActive(false);
         fourBallPoint.SetActive(false);
+        for (int i = 0; i < caromCushionTouch.Length; i++)
+        {
+            caromCushionTouch[i].SetActive(false);
+        }
         table.transform.Find("intl.controls/undo").gameObject.SetActive(false);
         table.transform.Find("intl.controls/redo").gameObject.SetActive(false);
         table.transform.Find("intl.controls/skipturn").gameObject.SetActive(false);

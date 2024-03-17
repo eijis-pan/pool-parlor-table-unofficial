@@ -18,7 +18,7 @@ using Metaphira.Modules.CameraOverride;
 public class BilliardsModule : UdonSharpBehaviour
 {
     [NonSerialized] public readonly string[] DEPENDENCIES = new string[] { nameof(CameraOverrideModule) };
-    [NonSerialized] public readonly string VERSION = "6.0.0";
+    [NonSerialized] public readonly string VERSION = "6.0.0 Carom";
 
     // table model properties
     [NonSerialized] public float k_TABLE_WIDTH; // horizontal span of table
@@ -72,8 +72,8 @@ public class BilliardsModule : UdonSharpBehaviour
     // globals
     [NonSerialized] public AudioSource aud_main;
     [NonSerialized] public UdonBehaviour callbacks;
-    private Vector3[][] initialPositions = new Vector3[4][];
-    private uint[] initialBallsPocketed = new uint[4];
+    private Vector3[][] initialPositions = new Vector3[7][];
+    private uint[] initialBallsPocketed = new uint[7];
 
     // constants
     private const float k_BALL_RADIUS = 0.03f;
@@ -196,6 +196,8 @@ public class BilliardsModule : UdonSharpBehaviour
     private int firstHit = 0;
     private int secondHit = 0;
     private int thirdHit = 0;
+    private int cushionBeforeSecondBall = 0;
+    private int cushionHitGoal = 3;
 
     private bool fbMadePoint = false;
     private bool fbMadeFoul = false;
@@ -224,6 +226,9 @@ public class BilliardsModule : UdonSharpBehaviour
     [NonSerialized] public bool is4Ball = false;
     [NonSerialized] public bool isJp4Ball = false;
     [NonSerialized] public bool isKr4Ball = false;
+    [NonSerialized] public bool is3Cusion = false;
+    [NonSerialized] public bool is2Cusion = false;
+    [NonSerialized] public bool is1Cusion = false;
     [NonSerialized] public bool isPracticeMode = false;
     [NonSerialized] public CameraOverrideModule cameraOverrideModule;
     public string[] moderators = new string[0];
@@ -725,7 +730,11 @@ public class BilliardsModule : UdonSharpBehaviour
             is9Ball = gameModeLocal == 1u;
             isJp4Ball = gameModeLocal == 2u;
             isKr4Ball = gameModeLocal == 3u;
-            is4Ball = isJp4Ball || isKr4Ball;
+            is3Cusion = gameModeLocal == 4u;
+            is2Cusion = gameModeLocal == 5u;
+            is1Cusion = gameModeLocal == 6u;
+            is4Ball = isJp4Ball || isKr4Ball || is3Cusion || is2Cusion || is1Cusion;
+            cushionHitGoal = is1Cusion ? 1 : (is2Cusion ? 2 : 3);
 
             menuManager._RefreshGameMode();
         }
@@ -1117,6 +1126,7 @@ public class BilliardsModule : UdonSharpBehaviour
         firstHit = 0;
         secondHit = 0;
         thirdHit = 0;
+        cushionBeforeSecondBall = 0;
         fbMadePoint = false;
         fbMadeFoul = false;
         ballsPocketedOrig = ballsPocketedLocal;
@@ -1228,6 +1238,38 @@ public class BilliardsModule : UdonSharpBehaviour
                     break;
                 }
                 break;
+            case 4:
+            case 5:
+            case 6:
+                if (firstHit == 0)
+                {
+                    firstHit = dstId;
+                    break;
+                }
+                if (secondHit == 0)
+                {
+                    if (dstId != firstHit)
+                    {
+                        secondHit = dstId;
+                        if (cushionHitGoal <= cushionBeforeSecondBall)
+                        {
+                            handle4BallHit(ballsP[dstId], true);
+                        }
+                    }
+                }
+                break;
+        }
+    }
+
+    public void _TriggerCushion(int id, Vector3 pos)
+    {
+        if ((is3Cusion || is2Cusion || is1Cusion) && id == 0 && secondHit == 0)
+        {
+            if (cushionBeforeSecondBall < cushionHitGoal)
+            {
+                graphicsManager._SpawnCushionTouch(pos, cushionBeforeSecondBall);
+            }
+            cushionBeforeSecondBall++;
         }
     }
 
@@ -1421,7 +1463,7 @@ public class BilliardsModule : UdonSharpBehaviour
     #region GameLogic
     private void initializeRack()
     {
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 7; i++)
         {
             initialPositions[i] = new Vector3[16];
             for (int j = 0; j < 16; j++)
@@ -1483,6 +1525,26 @@ public class BilliardsModule : UdonSharpBehaviour
             // 4 ball (kr)
             initialBallsPocketed[3] = initialBallsPocketed[2];
             initialPositions[3] = initialPositions[2];
+        }
+        
+        {
+            // 3-Cushion
+            initialBallsPocketed[4] = 0x9FFEu;
+            initialPositions[4][0] = new Vector3(-k_SPOT_POSITION_X, 0.0f, -0.15f);
+            initialPositions[4][13] = new Vector3(-k_SPOT_POSITION_X, 0.0f, 0.0f);
+            initialPositions[4][14] = new Vector3(k_SPOT_POSITION_X, 0.0f, 0.0f);
+        }
+
+        {
+            // 2-Cushion
+            initialBallsPocketed[5] = initialBallsPocketed[4];
+            initialPositions[5] = initialPositions[4];
+        }
+        
+        {
+            // 1-Cushion
+            initialBallsPocketed[6] = initialBallsPocketed[4];
+            initialPositions[6] = initialPositions[4];
         }
     }
 

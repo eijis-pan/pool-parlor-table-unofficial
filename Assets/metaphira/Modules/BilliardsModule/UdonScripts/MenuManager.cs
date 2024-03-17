@@ -21,6 +21,10 @@ public class MenuManager : UdonSharpBehaviour
     [SerializeField] public UIButton button4Ball;
     [SerializeField] public UIButton button4BallJP;
     [SerializeField] public UIButton button4BallKR;
+    [SerializeField] public UIButton buttonCarom;
+    [SerializeField] public UIButton button3Cushion;
+    [SerializeField] public UIButton button2Cushion;
+    [SerializeField] public UIButton button1Cushion;
     [SerializeField] public UIButton buttonTimerLeft;
     [SerializeField] public UIButton buttonTimerRight;
     [SerializeField] public UIButton buttonTeamsToggle;
@@ -81,6 +85,10 @@ public class MenuManager : UdonSharpBehaviour
         button4Ball._ResetPushButton();
         button4BallJP._ResetPushButton();
         button4BallKR._ResetPushButton();
+        buttonCarom._ResetPushButton();
+        button3Cushion._ResetPushButton();
+        button2Cushion._ResetPushButton();
+        button1Cushion._ResetPushButton();
 
         switch (menuGameMode)
         {
@@ -88,23 +96,62 @@ public class MenuManager : UdonSharpBehaviour
                 button8Ball._SetButtonPushed();
                 button4BallJP.gameObject.SetActive(false);
                 button4BallKR.gameObject.SetActive(false);
+                button3Cushion.gameObject.SetActive(false);
+                button2Cushion.gameObject.SetActive(false);
+                button1Cushion.gameObject.SetActive(false);
                 break;
             case 1:
                 button9Ball._SetButtonPushed();
                 button4BallJP.gameObject.SetActive(false);
                 button4BallKR.gameObject.SetActive(false);
+                button3Cushion.gameObject.SetActive(false);
+                button2Cushion.gameObject.SetActive(false);
+                button1Cushion.gameObject.SetActive(false);
                 break;
             case 2:
                 button4Ball._SetButtonPushed();
                 button4BallJP._SetButtonPushed();
                 button4BallJP.gameObject.SetActive(true);
                 button4BallKR.gameObject.SetActive(true);
+                button3Cushion.gameObject.SetActive(false);
+                button2Cushion.gameObject.SetActive(false);
+                button1Cushion.gameObject.SetActive(false);
                 break;
             case 3:
                 button4Ball._SetButtonPushed();
                 button4BallKR._SetButtonPushed();
                 button4BallJP.gameObject.SetActive(true);
                 button4BallKR.gameObject.SetActive(true);
+                button3Cushion.gameObject.SetActive(false);
+                button2Cushion.gameObject.SetActive(false);
+                button1Cushion.gameObject.SetActive(false);
+                break;
+            case 4:
+                buttonCarom._SetButtonPushed();
+                button3Cushion._SetButtonPushed();
+                button4BallJP.gameObject.SetActive(false);
+                button4BallKR.gameObject.SetActive(false);
+                button3Cushion.gameObject.SetActive(true);
+                button2Cushion.gameObject.SetActive(true);
+                button1Cushion.gameObject.SetActive(true);
+                break;
+            case 5:
+                buttonCarom._SetButtonPushed();
+                button2Cushion._SetButtonPushed();
+                button4BallJP.gameObject.SetActive(false);
+                button4BallKR.gameObject.SetActive(false);
+                button3Cushion.gameObject.SetActive(true);
+                button2Cushion.gameObject.SetActive(true);
+                button1Cushion.gameObject.SetActive(true);
+                break;
+            case 6:
+                buttonCarom._SetButtonPushed();
+                button1Cushion._SetButtonPushed();
+                button4BallJP.gameObject.SetActive(false);
+                button4BallKR.gameObject.SetActive(false);
+                button3Cushion.gameObject.SetActive(true);
+                button2Cushion.gameObject.SetActive(true);
+                button1Cushion.gameObject.SetActive(true);
                 break;
         }
     }
@@ -197,6 +244,10 @@ public class MenuManager : UdonSharpBehaviour
         button4Ball.disableInteractions = isNormalPlayer;
         button4BallJP.disableInteractions = isNormalPlayer;
         button4BallKR.disableInteractions = isNormalPlayer;
+        buttonCarom.disableInteractions = isNormalPlayer;
+        button3Cushion.disableInteractions = isNormalPlayer;
+        button2Cushion.disableInteractions = isNormalPlayer;
+        button1Cushion.disableInteractions = isNormalPlayer;
         buttonTeamsToggle.disableInteractions = isNormalPlayer;
         buttonGuidelineToggle.disableInteractions = isNormalPlayer;
         buttonLockingToggle.disableInteractions = isNormalPlayer;
@@ -257,6 +308,18 @@ public class MenuManager : UdonSharpBehaviour
             else if (button.name == "4BallKR")
             {
                 table._TriggerGameModeChanged(3);
+            }
+            else if (button.name == "Carom" || button.name == "3Cushion")
+            {
+                table._TriggerGameModeChanged(4);
+            }
+            else if (button.name == "2Cushion")
+            {
+                table._TriggerGameModeChanged(5);
+            }
+            else if (button.name == "1Cushion")
+            {
+                table._TriggerGameModeChanged(6);
             }
             else if (button.name == "TeamsToggle")
             {
