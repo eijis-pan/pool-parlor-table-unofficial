@@ -489,7 +489,7 @@ public class NetworkingManager : UdonSharpBehaviour
     private void swapFourBallCueBalls()
     {
         if (gameModeSynced != 2 && gameModeSynced != 3 && 
-            gameModeSynced != 4 && gameModeSynced != 5 && gameModeSynced != 6) return;
+            gameModeSynced != 4 && gameModeSynced != 5 && gameModeSynced != 6 && gameModeSynced != 7) return;
 
         fourBallCueBallSynced ^= 0x01;
         
@@ -679,6 +679,11 @@ public class NetworkingManager : UdonSharpBehaviour
             fourBallScoresSynced[0] = (int)(spec & 0x0fu);
             fourBallScoresSynced[1] = (int)((spec & 0x0fu) >> 4);
             if ((spec & 0x100u) == 0x100u) gameModeSynced = 3;
+        }
+        else if (4 <= gameModeSynced)
+        {
+            fourBallScoresSynced[0] = (int)(spec & 0x0fu);
+            fourBallScoresSynced[1] = (int)((spec & 0x0fu) >> 4);
         }
         else
         {

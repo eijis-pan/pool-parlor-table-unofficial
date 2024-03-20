@@ -705,7 +705,7 @@ int uniform_cue_colour;
             table.balls[0].SetActive(true);
             table.balls[13].SetActive(true);
             table.balls[14].SetActive(true);
-            table.balls[15].SetActive(!table.is3Cusion && !table.is2Cusion && !table.is1Cusion);
+            table.balls[15].SetActive(!table.is3Cusion && !table.is2Cusion && !table.is1Cusion && !table.is0Cusion);
         }
         else
         {

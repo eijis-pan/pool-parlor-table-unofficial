@@ -75,8 +75,8 @@ public class BilliardsModule : UdonSharpBehaviour
     // globals
     [NonSerialized] public AudioSource aud_main;
     [NonSerialized] public UdonBehaviour callbacks;
-    private Vector3[][] initialPositions = new Vector3[7][];
-    private uint[] initialBallsPocketed = new uint[7];
+    private Vector3[][] initialPositions = new Vector3[8][];
+    private uint[] initialBallsPocketed = new uint[8];
 
     // constants
     private const float k_BALL_RADIUS = 0.03f;
@@ -236,6 +236,7 @@ public class BilliardsModule : UdonSharpBehaviour
     [NonSerialized] public bool is3Cusion = false;
     [NonSerialized] public bool is2Cusion = false;
     [NonSerialized] public bool is1Cusion = false;
+    [NonSerialized] public bool is0Cusion = false;
     [NonSerialized] public bool isPracticeMode = false;
     [NonSerialized] public CameraOverrideModule cameraOverrideModule;
     public string[] moderators = new string[0];
@@ -411,7 +412,7 @@ public class BilliardsModule : UdonSharpBehaviour
 
     public void _TriggerGameModeChanged(uint newGameMode)
     {
-        if (4 <= newGameMode && newGameMode <= 6)
+        if (4 <= newGameMode && newGameMode <= 7)
         {
             networkingManager.physicsModeSynced = 3;
         }
@@ -764,8 +765,9 @@ public class BilliardsModule : UdonSharpBehaviour
             is3Cusion = gameModeLocal == 4u;
             is2Cusion = gameModeLocal == 5u;
             is1Cusion = gameModeLocal == 6u;
-            is4Ball = isJp4Ball || isKr4Ball || is3Cusion || is2Cusion || is1Cusion;
-            cushionHitGoal = is1Cusion ? 1 : (is2Cusion ? 2 : 3);
+            is0Cusion = gameModeLocal == 7u;
+            is4Ball = isJp4Ball || isKr4Ball || is3Cusion || is2Cusion || is1Cusion || is0Cusion;
+            cushionHitGoal = is0Cusion ? 0 : (is1Cusion ? 1 : (is2Cusion ? 2 : 3));
 
             // carom_adjust_canvas.SetActive(is3Cusion || is2Cusion || is1Cusion);
 
@@ -1290,6 +1292,7 @@ public class BilliardsModule : UdonSharpBehaviour
             case 4:
             case 5:
             case 6:
+            case 7:
                 if (firstHit == 0)
                 {
                     firstHit = dstId;
@@ -1312,7 +1315,7 @@ public class BilliardsModule : UdonSharpBehaviour
 
     public void _TriggerCushion(int id, Vector3 pos)
     {
-        if ((is3Cusion || is2Cusion || is1Cusion) && id == 0 && secondHit == 0)
+        if ((is3Cusion || is2Cusion || is1Cusion /* || is0Cusion */) && id == 0 && secondHit == 0)
         {
             if (cushionBeforeSecondBall < cushionHitGoal)
             {
@@ -1584,16 +1587,11 @@ public class BilliardsModule : UdonSharpBehaviour
             initialPositions[4][14] = new Vector3(k_SPOT_POSITION_X, 0.0f, 0.0f);
         }
 
+        for (int i = 5; i <= 7; i++)
         {
-            // 2-Cushion
-            initialBallsPocketed[5] = initialBallsPocketed[4];
-            initialPositions[5] = initialPositions[4];
-        }
-        
-        {
-            // 1-Cushion
-            initialBallsPocketed[6] = initialBallsPocketed[4];
-            initialPositions[6] = initialPositions[4];
+            // 0 ～ 2-Cushion
+            initialBallsPocketed[i] = initialBallsPocketed[4];
+            initialPositions[i] = initialPositions[4];
         }
     }
 
