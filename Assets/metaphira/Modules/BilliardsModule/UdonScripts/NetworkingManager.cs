@@ -96,6 +96,9 @@ public class NetworkingManager : UdonSharpBehaviour
     // the current table skin
     [UdonSynced] [NonSerialized] public byte tableSkinSynced;
 
+    [UdonSynced] [NonSerialized] public byte caromAdjustPowerSynced;
+    [UdonSynced] [NonSerialized] public byte caromAdjustGravitySynced;
+
     [SerializeField] private PlayerSlot[] playerSlots;
     
     private BilliardsModule table;
@@ -515,7 +518,15 @@ public class NetworkingManager : UdonSharpBehaviour
         hasBufferedMessages = false;
         packetIdSynced++;
 
-        Networking.SetOwner(Networking.LocalPlayer, this.gameObject);
+        VRCPlayerApi localPlayer = Networking.LocalPlayer;
+        if (localPlayer != null)
+        {
+            Networking.SetOwner(Networking.LocalPlayer, this.gameObject);
+        }
+        // else
+        // {
+        //     Debug.Log(">>>>>>>>>>>>> BilliardsModule NetworkingManager::_FlushBuffer() invalid Networking.LocalPlayer");
+        // }
         this.RequestSerialization();
     }
 

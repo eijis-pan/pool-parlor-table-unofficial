@@ -1,4 +1,5 @@
-﻿
+﻿#define EIJIS_MNBK_AUTOCOUNTER
+
 using UdonSharp;
 using UnityEngine;
 using UnityEngine.UI;
@@ -292,6 +293,9 @@ public class GraphicsManager : UdonSharpBehaviour
                 break;
             case 2:
                 settings += "Beta Physics";
+                break;
+            case 3:
+                settings += "Standard Physics (for Carom)";
                 break;
         }
         if (!string.IsNullOrEmpty(table.tournamentRefereeLocal))

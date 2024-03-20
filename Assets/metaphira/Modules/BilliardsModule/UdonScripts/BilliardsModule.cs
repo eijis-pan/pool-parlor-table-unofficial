@@ -1,4 +1,7 @@
-﻿#if UNITY_ANDROID
+﻿#define EIJIS_MNBK_AUTOCOUNTER
+//#define DEBUG_EIJIS_MNBK_AUTOCOUNTER
+
+#if UNITY_ANDROID
 #define HT_QUEST
 #endif
 
@@ -88,6 +91,9 @@ public class BilliardsModule : UdonSharpBehaviour
     private readonly int[] break_rows_9ball = { 0, 1, 2, 1, 0 };
 
     #region InspectorValues
+    [Header("Debug")]
+    [SerializeField] public string logLabel;
+
     [Header("Managers")]
     [SerializeField] public NetworkingManager networkingManager;
     [SerializeField] public PracticeManager practiceManager;
@@ -97,6 +103,7 @@ public class BilliardsModule : UdonSharpBehaviour
     [SerializeField] public GraphicsManager graphicsManager;
     [SerializeField] public LegacyPhysicsManager legacyPhysicsManager;
     [SerializeField] public StandardPhysicsManager standardPhysicsManager;
+    [SerializeField] public StandardCaromPhysicsManager standardCaromPhysicsManager;
     [SerializeField] public BetaPhysicsManager betaPhysicsManager;
     [SerializeField] public MenuManager menuManager;
 
@@ -244,7 +251,8 @@ public class BilliardsModule : UdonSharpBehaviour
 
         resetCachedData();
 
-        currentPhysicsManager = standardPhysicsManager;
+        //currentPhysicsManager = standardPhysicsManager;
+        currentPhysicsManager = standardCaromPhysicsManager;
 
         setTableModel(0, false);
 
@@ -255,7 +263,11 @@ public class BilliardsModule : UdonSharpBehaviour
             balls[i].GetComponentInChildren<Repositioner>(true)._Init(this, i);
         }
 
+        gameModeLocal = 4u; // 3-Cushion
+        is4Ball = is3Cusion = true;
+
         networkingManager._Init(this);
+        networkingManager.gameModeSynced = (byte)gameModeLocal;
         practiceManager._Init(this);
         repositionManager._Init(this);
         desktopManager._Init(this);
@@ -263,13 +275,14 @@ public class BilliardsModule : UdonSharpBehaviour
         graphicsManager._Init(this);
         legacyPhysicsManager._Init(this);
         standardPhysicsManager._Init(this);
+        standardCaromPhysicsManager._Init(this);
         betaPhysicsManager._Init(this);
         menuManager._Init(this);
 
         currentPhysicsManager.SendCustomEvent("_InitConstants");
 
-        physicsModeLocal = 1;
-        networkingManager.physicsModeSynced = 1;
+        physicsModeLocal = 3;
+        networkingManager.physicsModeSynced = 3;
 
 
 #if HT8B_DEBUGGER
@@ -398,6 +411,14 @@ public class BilliardsModule : UdonSharpBehaviour
 
     public void _TriggerGameModeChanged(uint newGameMode)
     {
+        if (4 <= newGameMode && newGameMode <= 6)
+        {
+            networkingManager.physicsModeSynced = 3;
+        }
+        else
+        {
+            networkingManager.physicsModeSynced = 1;
+        }
         networkingManager._OnGameModeChanged(newGameMode);
     }
 
@@ -493,6 +514,13 @@ public class BilliardsModule : UdonSharpBehaviour
     public void _TriggerGameStart()
     {
         _LogYes("starting game");
+
+        // networkingManager.caromAdjustPowerSynced = (byte)carom_adjust_power.value;
+        // networkingManager.caromAdjustGravitySynced = (byte)carom_adjust_gravity.value;
+        // _LogInfo($"CAROM_DEBUG  carom_adjust_power={networkingManager.caromAdjustPowerSynced}, carom_adjust_gravity={networkingManager.caromAdjustGravitySynced}");
+
+        // networkingManager.caromAdjustPowerSynced = 11;
+        // networkingManager.caromAdjustGravitySynced = 6;
 
         networkingManager._OnGameStart(initialBallsPocketed[gameModeLocal], initialPositions[gameModeLocal]);
     }
@@ -691,6 +719,9 @@ public class BilliardsModule : UdonSharpBehaviour
                 case 2:
                     currentPhysicsManager = betaPhysicsManager;
                     break;
+                case 3:
+                    currentPhysicsManager = standardCaromPhysicsManager;
+                    break;
             }
             currentPhysicsManager.SendCustomEvent("_InitConstants");
         }
@@ -735,6 +766,8 @@ public class BilliardsModule : UdonSharpBehaviour
             is1Cusion = gameModeLocal == 6u;
             is4Ball = isJp4Ball || isKr4Ball || is3Cusion || is2Cusion || is1Cusion;
             cushionHitGoal = is1Cusion ? 1 : (is2Cusion ? 2 : 3);
+
+            // carom_adjust_canvas.SetActive(is3Cusion || is2Cusion || is1Cusion);
 
             menuManager._RefreshGameMode();
         }
@@ -824,6 +857,8 @@ public class BilliardsModule : UdonSharpBehaviour
     {
         _LogInfo($"onRemoteLobbyOpened");
 
+        // carom_adjust_canvas.SetActive(is3Cusion || is2Cusion || is1Cusion);
+
         lobbyOpen = true;
         graphicsManager._OnLobbyOpened();
         menuManager._RefreshLobbyOpen();
@@ -835,6 +870,8 @@ public class BilliardsModule : UdonSharpBehaviour
     private void onRemoteLobbyClosed()
     {
         _LogInfo($"onRemoteLobbyClosed");
+
+        // carom_adjust_canvas.SetActive(false);
 
         lobbyOpen = false;
         localPlayerId = -1;
@@ -856,6 +893,18 @@ public class BilliardsModule : UdonSharpBehaviour
         Array.Clear(perfCounters, 0, PERF_MAX);
         Array.Clear(perfStart, 0, PERF_MAX);
         Array.Clear(perfTimings, 0, PERF_MAX);
+
+        // carom_adjust_power.value = networkingManager.caromAdjustPowerSynced;
+        // carom_adjust_gravity.value = networkingManager.caromAdjustGravitySynced;
+        // _LogInfo($"CAROM_DEBUG  carom_adjust_power={networkingManager.caromAdjustPowerSynced}, carom_adjust_gravity={networkingManager.caromAdjustGravitySynced}");
+        // standardCaromPhysicsManager.power_adjust = carom_adjust_power.value / 10;
+        // standardCaromPhysicsManager.gravity_etc_fixed = -0.00122583125f * (carom_adjust_gravity.value / 10);
+        // _LogInfo($"CAROM_DEBUG power_adjust={standardCaromPhysicsManager.power_adjust}, gravity_etc_fixed={standardCaromPhysicsManager.gravity_etc_fixed}");
+        // carom_adjust_canvas.SetActive(false);
+
+        // standardCaromPhysicsManager.power_adjust = 1.1;
+        // standardCaromPhysicsManager.gravity_etc_fixed = -0.00122583125f * 0.6;
+        // _LogInfo($"CAROM_DEBUG power_adjust={standardCaromPhysicsManager.power_adjust}, gravity_etc_fixed=0.6");
 
         isPracticeMode = playerNamesLocal[1] == "" && playerNamesLocal[3] == "";
 
@@ -1630,6 +1679,11 @@ public class BilliardsModule : UdonSharpBehaviour
         return physicsModeLocal == 2;
     }
 
+    public bool _IsCaromPhysics()
+    {
+        return physicsModeLocal == 3;
+    }
+
     public GameObject _GetTableBase()
     {
         return tableModels[tableModelLocal].transform.Find("table_artwork").gameObject;
@@ -2178,9 +2232,9 @@ public void _RedrawDebugger() { }
 
     private void _log(string ln)
     {
-        Debug.Log("[<color=\"#B5438F\">BilliardsModule</color>] " + ln);
+        Debug.Log("[<color=\"#B5438F\">BilliardsModule</color> " + logLabel + "] " + ln);
 
-        LOG_LINES[LOG_PTR++] = "[<color=\"#B5438F\">BilliardsModule</color>] " + ln + "\n";
+        LOG_LINES[LOG_PTR++] = "[<color=\"#B5438F\">BilliardsModule " + logLabel + "</color>] " + ln + "\n";
         LOG_LEN++;
 
         if (LOG_PTR >= LOG_MAX)
@@ -2198,7 +2252,11 @@ public void _RedrawDebugger() { }
 
     private void redrawDebugger()
     {
+#if EIJIS_MNBK_AUTOCOUNTER
+        string output = "BilliardsModule " + VERSION + " [" + logLabel + "] ";
+#else
         string output = "BilliardsModule ";
+#endif
 
         // Add information about game state:
         output += Networking.IsOwner(Networking.LocalPlayer, networkingManager.gameObject) ?
@@ -2214,9 +2272,12 @@ public void _RedrawDebugger() { }
 
         output += physicsModeLocal == 0 ?
            "<color=\"#95a2b8\">phys(</color> <color=\"#4287F5\">LEGACY</color> <color=\"#95a2b8\">)</color> " :
+           (physicsModeLocal == 3 ?
+            "<color=\"#95a2b8\">phys(</color> <color=\"#678AC2\"> CAROM </color> <color=\"#95a2b8\">)</color> " :
            (physicsModeLocal == 1 ?
            "<color=\"#95a2b8\">phys(</color> <color=\"#678AC2\"> STND </color> <color=\"#95a2b8\">)</color> " :
            "<color=\"#95a2b8\">phys(</color> <color=\"#678AC2\"> BETA </color> <color=\"#95a2b8\">)</color> "
+           )
            );
 
         output += "\n---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n";
