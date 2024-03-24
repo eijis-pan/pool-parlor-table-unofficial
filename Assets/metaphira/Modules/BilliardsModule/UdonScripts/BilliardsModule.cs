@@ -88,6 +88,9 @@ public class BilliardsModule : UdonSharpBehaviour
     private readonly int[] break_rows_9ball = { 0, 1, 2, 1, 0 };
 
     #region InspectorValues
+    [Header("Debug")]
+    [SerializeField] public string logLabel;
+
     [Header("Managers")]
     [SerializeField] public NetworkingManager networkingManager;
     [SerializeField] public PracticeManager practiceManager;
@@ -230,6 +233,7 @@ public class BilliardsModule : UdonSharpBehaviour
 
     private void OnEnable()
     {
+        logLabel = string.IsNullOrEmpty(logLabel) ? string.Empty : " " + logLabel;
 
         _LogInfo("initializing billiards module");
 
@@ -607,7 +611,7 @@ public class BilliardsModule : UdonSharpBehaviour
     public void _OnRemoteDeserialization()
     {
         _LogInfo("processing latest remote state (packet=" + networkingManager.packetIdSynced + ", state=" + networkingManager.stateIdSynced + ")");
-        Debug.Log("[BilliardsModule] latest game state is " + networkingManager._EncodeGameState());
+        Debug.Log("[BilliardsModule" + logLabel + "] latest game state is " + networkingManager._EncodeGameState());
 
         // propagate game settings first
         onRemoteGlobalSettingsUpdated(
@@ -2116,9 +2120,9 @@ public void _RedrawDebugger() { }
 
     private void _log(string ln)
     {
-        Debug.Log("[<color=\"#B5438F\">BilliardsModule</color>] " + ln);
+        Debug.Log("[<color=\"#B5438F\">BilliardsModule</color>" + logLabel + "] " + ln);
 
-        LOG_LINES[LOG_PTR++] = "[<color=\"#B5438F\">BilliardsModule</color>] " + ln + "\n";
+        LOG_LINES[LOG_PTR++] = "[<color=\"#B5438F\">BilliardsModule" + logLabel + "</color>] " + ln + "\n";
         LOG_LEN++;
 
         if (LOG_PTR >= LOG_MAX)
@@ -2136,7 +2140,7 @@ public void _RedrawDebugger() { }
 
     private void redrawDebugger()
     {
-        string output = "BilliardsModule ";
+        string output = "BilliardsModule " + VERSION + " [" + logLabel + " ] ";
 
         // Add information about game state:
         output += Networking.IsOwner(Networking.LocalPlayer, networkingManager.gameObject) ?
