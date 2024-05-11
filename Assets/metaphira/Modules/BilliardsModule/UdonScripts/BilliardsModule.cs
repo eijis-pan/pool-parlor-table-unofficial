@@ -6,6 +6,17 @@
 #define HT8B_DEBUGGER
 #endif
 
+//#define TKCH_DEBUG_IN_KITCHEN
+//#define TKCH_DEBUG_UPON_FOOT
+//#define TKCH_DEBUG_BREAKING_FOUL
+//#define TKCH_DEBUG_CALLSHOT_DELAY
+//#define TKCH_DEBUG_CALLSHOT_POCKETEDBALL
+//#define TKCH_DEBUG_SCORE
+//#define TKCH_DEBUG_WINRACKCOUNT
+//#define TKCH_DEBUG_SEMIAUTO_CALL
+#define TKCH_CALLSHOT_CALLEDPBALL_DELAY
+#define TKCH_CALLSHOT_CALLEDPOCKET_DELAY
+
 using UdonSharp;
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,12 +24,13 @@ using VRC.SDKBase;
 using VRC.Udon;
 using System;
 using Metaphira.Modules.CameraOverride;
+using Unity.Mathematics;
 
 [UdonBehaviourSyncMode(BehaviourSyncMode.NoVariableSync)]
 public class BilliardsModule : UdonSharpBehaviour
 {
     [NonSerialized] public readonly string[] DEPENDENCIES = new string[] { nameof(CameraOverrideModule) };
-    [NonSerialized] public readonly string VERSION = "6.0.0";
+    [NonSerialized] public readonly string VERSION = "6.0.0 rotation";
 
     // table model properties
     [NonSerialized] public float k_TABLE_WIDTH; // horizontal span of table
@@ -35,6 +47,10 @@ public class BilliardsModule : UdonSharpBehaviour
     [NonSerialized] public GameObject auto_pocketblockers;
     private GameObject auto_colliderBaseVFX;
     [NonSerialized] public Transform table;
+    [NonSerialized] public GameObject[] pointPocketMarkers;
+    [NonSerialized] public GameObject[] pointPocketMarkerSphere;
+    private float findNearestPocket_x;
+    private float findNearestPocket_n;
 
     // table colors
     [SerializeField] [HideInInspector] public Color k_colour_foul;        // v1.6: ( 1.2, 0.0, 0.0, 1.0 )
@@ -72,8 +88,8 @@ public class BilliardsModule : UdonSharpBehaviour
     // globals
     [NonSerialized] public AudioSource aud_main;
     [NonSerialized] public UdonBehaviour callbacks;
-    private Vector3[][] initialPositions = new Vector3[4][];
-    private uint[] initialBallsPocketed = new uint[4];
+    private Vector3[][] initialPositions = new Vector3[5][];
+    private uint[] initialBallsPocketed = new uint[5];
 
     // constants
     private const float k_BALL_RADIUS = 0.03f;
@@ -84,12 +100,28 @@ public class BilliardsModule : UdonSharpBehaviour
     private const float k_SPOT_POSITION_X = 0.5334f; // First X position of the racked balls
     private const float k_SPOT_CAROM_X = 0.8001f; // Spot position for carom mode
     private readonly int[] break_order_8ball = { 9, 2, 10, 11, 1, 3, 4, 12, 5, 13, 14, 6, 15, 7, 8 };
+    private readonly int[] break_order_rotation = { 2, 8, 1, 11, 12, 13, 9, 14, 15, 10, 3, 5, 6, 7, 4 };
     private readonly int[] break_order_9ball = { 2, 3, 4, 5, 9, 6, 7, 8, 1 };
     private readonly int[] break_rows_9ball = { 0, 1, 2, 1, 0 };
+    private readonly uint rotation_pocket_mask = 0xFFFEu;
 
     #region InspectorValues
     [Header("Debug")]
     [SerializeField] public string logLabel;
+
+    [Header("Call Shot")]
+    [SerializeField] public GameObject markerCalledBall;
+    [SerializeField] Material calledBallMarkerBlue;
+    [SerializeField] Material calledBallMarkerOrange;
+    [SerializeField] Material calledBallMarkerWhite;
+
+    [Header("Rotation")]
+    [SerializeField] public BilliardsScoreScreen scoreScreen;
+    [SerializeField] public GameObject markerHeadSpot;
+    [SerializeField] public GameObject markerCenterSpot;
+    [SerializeField] public GameObject markerFootSpot;
+    [SerializeField] public GameObject requestBreakOrange;
+    [SerializeField] public GameObject requestBreakBlue;
 
     [Header("Managers")]
     [SerializeField] public NetworkingManager networkingManager;
@@ -168,11 +200,19 @@ public class BilliardsModule : UdonSharpBehaviour
     [NonSerialized] public bool lobbyOpen;
     [NonSerialized] public bool gameLive;
     [NonSerialized] public uint gameModeLocal;
+    [NonSerialized] public int goalPointsLocal = 120;
+    [NonSerialized] public uint rackConditionLocal = 1;
+    [NonSerialized] public bool semiAutoCallBallLocal;
+    [NonSerialized] public bool semiAutoCallPocketLocal;
     [NonSerialized] public uint timerLocal;
     [NonSerialized] public bool teamsLocal;
     [NonSerialized] public bool noGuidelineLocal;
     [NonSerialized] public bool noLockingLocal;
     [NonSerialized] public uint ballsPocketedLocal;
+    [NonSerialized] public uint targetPocketedLocal;
+    [NonSerialized] public uint otherPocketedLocal;
+    [NonSerialized] public uint pointPocketsLocal;
+    [NonSerialized] public uint calledBallsLocal;
     [NonSerialized] public uint teamIdLocal;
     [NonSerialized] public uint fourBallCueBallLocal;
     [NonSerialized] public bool isTableOpenLocal;
@@ -180,25 +220,53 @@ public class BilliardsModule : UdonSharpBehaviour
     [NonSerialized] public string[] playerNamesLocal = new string[4];
     [NonSerialized] public string tournamentRefereeLocal;
     [NonSerialized] public int[] fbScoresLocal = new int[2];
+    [NonSerialized] public int[] totalPointsLocal = new int[2];
+    [NonSerialized] public int[] chainedPointsLocal = new int[2];
+    [NonSerialized] public bool noCushionLocal;
     [NonSerialized] public uint winningTeamLocal;
     [NonSerialized] public uint previewWinningTeamLocal;
     [NonSerialized] public int activeCueSkin;
     [NonSerialized] public int tableSkinLocal;
     [NonSerialized] public int physicsModeLocal;
+    [NonSerialized] public int stateIdLocal;
     private byte gameStateLocal = byte.MaxValue;
     private byte turnStateLocal = byte.MaxValue;
     private int timerStartLocal;
     private uint repositionStateLocal;
+    private uint nextBallRepositionStateLocal;
     private int tableModelLocal;
+    private bool callShotLockLocal;
+    private bool calledBallOff = false;
+    private bool calledPocketOff = false;
+    private int inningCountLocal;
+    private int[] winRackCountLocal = new int[2];
+#if TKCH_CALLSHOT_CALLEDPBALL_DELAY || TKCH_CALLSHOT_CALLEDPOCKET_DELAY
+    private float callShotDelay = 0.4f;
+#endif
+#if TKCH_CALLSHOT_CALLEDPBALL_DELAY
+    private int calledBallId = -2;
+    private float calledBallIdDelayTimestamp = 0;
+#endif
+#if TKCH_CALLSHOT_CALLEDPOCKET_DELAY
+    private int calledPocketId = -2;
+    private float calledPocketIdDelayTimestamp = 0;
+#endif
+    private bool semiAutoCalledBall;
+    private bool semiAutoCalledPocket;
 
     // physics simulation data, must be reset before every simulation
     [NonSerialized] public bool isLocalSimulationRunning;
     private bool isLocalSimulationOurs = false;
 
     private uint ballsPocketedOrig;
+    private uint targetPocketedOrig;
+    private uint otherPocketedOrig;
     private int firstHit = 0;
     private int secondHit = 0;
     private int thirdHit = 0;
+    private int cushionAfterFirstHit = 0;
+    private uint cushionObjectiveBallsOnBreak = 0x0u;
+    private bool afterBreak;
 
     private bool fbMadePoint = false;
     private bool fbMadeFoul = false;
@@ -227,12 +295,16 @@ public class BilliardsModule : UdonSharpBehaviour
     [NonSerialized] public bool is4Ball = false;
     [NonSerialized] public bool isJp4Ball = false;
     [NonSerialized] public bool isKr4Ball = false;
+    [NonSerialized] public bool isRotation = false;
     [NonSerialized] public bool isPracticeMode = false;
     [NonSerialized] public CameraOverrideModule cameraOverrideModule;
     public string[] moderators = new string[0];
 
+    [NonSerialized] public Vector3[] pcketLocations = new Vector3[6];
+
     private void OnEnable()
     {
+        scoreScreen.SetPointSigned(false);
         logLabel = string.IsNullOrEmpty(logLabel) ? string.Empty : " " + logLabel;
 
         _LogInfo("initializing billiards module");
@@ -254,7 +326,22 @@ public class BilliardsModule : UdonSharpBehaviour
             balls[i].GetComponentInChildren<Repositioner>(true)._Init(this, i);
         }
 
+        gameModeLocal = 4;
+        isRotation = true;
+        rackConditionLocal = 1;
+        semiAutoCallBallLocal = true;
+        semiAutoCallPocketLocal = true;
+        pointPocketsLocal = 0;
+        calledBallsLocal = 0;
+        
         networkingManager._Init(this);
+        networkingManager.gameModeSynced = (byte)gameModeLocal;
+        networkingManager.rackConditionSynced = (byte)rackConditionLocal;
+        networkingManager.semiAutoCallBallSynced = semiAutoCallBallLocal;
+        networkingManager.semiAutoCallPocketSynced = semiAutoCallPocketLocal;
+        networkingManager.pointPocketsSynced = pointPocketsLocal;
+        networkingManager.calledBallsSynced = calledBallsLocal;
+
         practiceManager._Init(this);
         repositionManager._Init(this);
         desktopManager._Init(this);
@@ -283,6 +370,15 @@ public class BilliardsModule : UdonSharpBehaviour
         graphicsManager._OnGameStarted();
         menuManager.menuSettings.transform.localScale = Vector3.zero;
 #endif
+        
+        pcketLocations[0] = k_vE;
+        pcketLocations[1] = new Vector3(k_vE.x, k_vE.y, -k_vE.z);
+        pcketLocations[2] = new Vector3(-k_vE.x, k_vE.y, k_vE.z);
+        pcketLocations[3] = new Vector3(-k_vE.x, k_vE.y, -k_vE.z);
+        pcketLocations[4] = k_vF;
+        pcketLocations[5] = new Vector3(k_vF.x, k_vF.y, -k_vF.z);
+        findNearestPocket_x = k_vE.x / 2;
+        findNearestPocket_n = findNearestPocket_x / k_vE.z;
     }
 
     private void FixedUpdate()
@@ -304,6 +400,7 @@ public class BilliardsModule : UdonSharpBehaviour
         graphicsManager._Tick();
         tickTimer();
         _Update9BallMarker();
+        _UpdateCalledBallMarker();
 
         networkingManager._FlushBuffer();
         _EndPerf(PERF_MAIN);
@@ -367,6 +464,9 @@ public class BilliardsModule : UdonSharpBehaviour
     {
         if (lobbyOpen) return;
 
+        scoreScreen.Clear();
+        Array.Copy(scoreScreen.EncodeScoreSyncValues(), networkingManager.scoreSyncRows, networkingManager.scoreSyncRows.Length);
+
         networkingManager._OnLobbyOpened();
     }
 
@@ -390,6 +490,21 @@ public class BilliardsModule : UdonSharpBehaviour
         networkingManager._OnNoLockingChanged(noLockingEnabled);
     }
 
+    public void _TriggerRackCondisionChanged(uint rackCondition)
+    {
+        networkingManager._OnRackCondisionChanged(rackCondition);
+    }
+
+    public void _TriggerSemiAutoCallBallChanged(bool semiAutoCallBallEnabled)
+    {
+        networkingManager._OnSemiAutoCallBallChanged(semiAutoCallBallEnabled);
+    }
+
+    public void _TriggerSemiAutoCallPocketChanged(bool semiAutoCallPocketEnabled)
+    {
+        networkingManager._OnSemiAutoCallPocketChanged(semiAutoCallPocketEnabled);
+    }
+
     public void _TriggerTimerChanged(uint timerSelected)
     {
         networkingManager._OnTimerChanged(timerSelected);
@@ -398,6 +513,11 @@ public class BilliardsModule : UdonSharpBehaviour
     public void _TriggerGameModeChanged(uint newGameMode)
     {
         networkingManager._OnGameModeChanged(newGameMode);
+    }
+
+    public void _TriggerGoalPointsChanged(int goalPoints)
+    {
+        networkingManager._OnGoalPointsChanged(goalPoints);
     }
 
     public void _TriggerGlobalSettingsUpdated(string newTournamentReferee, int newPhysicsMode, int newTableModel, int newTableSkin)
@@ -421,6 +541,149 @@ public class BilliardsModule : UdonSharpBehaviour
         _TriggerCueDeactivate();
 
         networkingManager._OnHitBall(ballsV[0], ballsW[0]);
+    }
+
+    public void _TriggerOtherBallHit(int ballId, bool desktop)
+    {
+        if (localTeamId != teamIdLocal && !isPracticeMode) return; // is there a better way to do this?
+
+        if (callShotLockLocal)
+        {
+            return;
+        }
+        
+#if TKCH_CALLSHOT_CALLEDPBALL_DELAY
+        if (!desktop && calledBallId == ballId)
+        {
+            return;
+        }
+
+        if (!desktop && Time.time < calledBallIdDelayTimestamp + callShotDelay)
+        {
+            return;
+        }
+        else
+        {
+#if TKCH_DEBUG_CALLSHOT_DELAY
+            _LogInfo($"  calledBallId = {calledBallId}, calledBallIdDelayTimestamp = {calledBallIdDelayTimestamp}, callShotDelay = {callShotDelay}");
+#endif
+            calledBallIdDelayTimestamp = Time.time;
+            calledBallId = ballId;
+        }
+#endif
+
+#if TKCH_CALLSHOT_CALLEDPBALL_DELAY
+        int id = calledBallId;
+#else
+        int id = ballId;
+#endif
+
+#if TKCH_DEBUG_CALLSHOT_POCKETEDBALL
+        _LogInfo($"  id = {id}, ballsPocketedLocal = {ballsPocketedLocal:X4}, (0x1 << id) = {(0x1 << id):X4}");
+#endif
+        if (0 < id && 0 != (ballsPocketedLocal & (0x1 << id)))
+        {
+#if TKCH_DEBUG_CALLSHOT_POCKETEDBALL
+            _LogInfo("  return");
+#endif
+            return;
+        }
+
+        if (id < 0)
+        {
+            calledBallOff = true;
+            return;
+        }
+
+        if (!calledBallOff && !desktop)
+        {
+            return;
+        }
+
+        uint calledBalls = calledBallsLocal;
+        calledBalls |= 0x1u << id;
+        if (calledBalls == calledBallsLocal)
+        {
+            calledBalls ^= 0x1u << id;
+        }
+
+        if (calledBallsLocal != 0 && calledBalls != 0 && !desktop)
+        {
+            return;
+        }
+
+        bool enable = (calledBallsLocal < calledBalls);
+        
+        networkingManager._OnCalledBallChanged(enable, (uint)id);
+        calledBallOff = false;
+
+        //aud_main.PlayOneShot(snd_btn);
+    }
+
+    public void _TriggerPocketHit(int pocketId, bool desktop)
+    {
+        if (localTeamId != teamIdLocal && !isPracticeMode) return; // is there a better way to do this?
+
+        if (callShotLockLocal)
+        {
+            return;
+        }
+        
+#if TKCH_CALLSHOT_CALLEDPOCKET_DELAY
+        if (!desktop && calledPocketId == pocketId)
+        {
+            return;
+        }
+
+        if (!desktop && Time.time < calledPocketIdDelayTimestamp + callShotDelay)
+        {
+            return;
+        }
+        else
+        {
+#if TKCH_DEBUG_CALLSHOT_DELAY
+            _LogInfo($"  calledPocketId = {calledPocketId}, calledPocketIdDelayTimestamp = {calledPocketIdDelayTimestamp}, callShotDelay = {callShotDelay}");
+#endif
+            calledPocketIdDelayTimestamp = Time.time;
+            calledPocketId = pocketId;
+        }
+#endif
+
+#if TKCH_CALLSHOT_CALLEDPOCKET_DELAY
+        int id = calledPocketId;
+#else
+        int id = pocketId;
+#endif
+
+        if (id < 0)
+        {
+            calledPocketOff = true;
+            return;
+        }
+
+        if (!calledPocketOff && !desktop)
+        {
+            return;
+        }
+
+        uint pointPockets = pointPocketsLocal;
+        pointPockets |= 0x1u << id;
+        if (pointPockets == pointPocketsLocal)
+        {
+            pointPockets ^= 0x1u << id;
+        }
+
+        if (pointPocketsLocal != 0 && pointPockets != 0 && !desktop)
+        {
+            return;
+        }
+
+        bool enable = (pointPocketsLocal < pointPockets);
+        
+        networkingManager._OnPocketChanged(enable, (uint)id);
+        calledPocketOff = false;
+        
+        //aud_main.PlayOneShot(snd_btn);
     }
 
     public void _TriggerCueActivate()
@@ -492,6 +755,8 @@ public class BilliardsModule : UdonSharpBehaviour
     public void _TriggerGameStart()
     {
         _LogYes("starting game");
+
+        networkingManager.inningCountSynced = 0;
 
         networkingManager._OnGameStart(initialBallsPocketed[gameModeLocal], initialPositions[gameModeLocal]);
     }
@@ -612,6 +877,9 @@ public class BilliardsModule : UdonSharpBehaviour
     {
         _LogInfo("processing latest remote state (packet=" + networkingManager.packetIdSynced + ", state=" + networkingManager.stateIdSynced + ")");
         Debug.Log("[BilliardsModule" + logLabel + "] latest game state is " + networkingManager._EncodeGameState());
+#if TKCH_DEBUG_WINRACKCOUNT
+        _LogInfo($"  networkingManager.winRackCountSynced = {networkingManager.winRackCountSynced[0]}-{networkingManager.winRackCountSynced[1]}");
+#endif
 
         // propagate game settings first
         onRemoteGlobalSettingsUpdated(
@@ -622,10 +890,14 @@ public class BilliardsModule : UdonSharpBehaviour
         );
         onRemoteGameSettingsUpdated(
             networkingManager.gameModeSynced,
+            networkingManager.goalPointsSynced,
             networkingManager.timerSynced,
             networkingManager.teamsSynced,
             networkingManager.noGuidelineSynced,
-            networkingManager.noLockingSynced
+            networkingManager.noLockingSynced,
+            networkingManager.rackConditionSynced,
+            networkingManager.semiAutoCallBallSynced,
+            networkingManager.semiAutoCallPocketSynced
         );
 
         if (gameStateLocal != networkingManager.gameStateSynced && networkingManager.gameStateSynced == 1)
@@ -636,6 +908,30 @@ public class BilliardsModule : UdonSharpBehaviour
         // propagate valid players second
         onRemotePlayersChanged(networkingManager.playerNamesSynced);
 
+        bool scoreUpdate = true;
+        if (lobbyOpen || gameLive)
+        {
+            if (networkingManager.stateIdSynced <= 1)
+            {
+                scoreScreen.Clear();
+                scoreUpdate = false;
+#if TKCH_DEBUG_SCORE
+                _LogInfo($"  EmptyTextOnZero 01 teamIdLocal = {teamIdLocal}, teamColorLocal = {teamColorLocal}");
+#endif
+            }
+        }
+        
+#if TKCH_DEBUG_SCORE
+        _LogInfo($"  scoreUpdate = {scoreUpdate}");
+#endif
+        if (scoreUpdate)
+        {
+#if TKCH_DEBUG_SCORE
+            _LogInfo($"  networkingManager.scoreSyncRows = {networkingManager.scoreSyncRows[0]:X8}-{networkingManager.scoreSyncRows[1]:X8}");
+#endif
+            scoreScreen.DecodeScoreSyncValues(networkingManager.scoreSyncRows);
+        }
+        
         // apply state transitions if needed
         onRemoteGameStateChanged(networkingManager.gameStateSynced);
 
@@ -643,15 +939,31 @@ public class BilliardsModule : UdonSharpBehaviour
         onRemoteBallPositionsChanged(networkingManager.ballsPSynced);
         onRemoteTeamIdChanged(networkingManager.teamIdSynced);
         onRemoteFourBallCueBallChanged(networkingManager.fourBallCueBallSynced);
-        onRemoteBallsPocketedChanged(networkingManager.ballsPocketedSynced);
+        onRemoteBallsPocketedChanged(networkingManager.ballsPocketedSynced, networkingManager.targetPocketedSynced, networkingManager.otherPocketedSynced);
         onRemoteFourBallScoresUpdated(networkingManager.fourBallScoresSynced);
         onRemoteRepositionStateChanged(networkingManager.repositionStateSynced);
         onRemoteIsTableOpenChanged(networkingManager.isTableOpenSynced, networkingManager.teamColorSynced);
         onRemoteTurnStateChanged(networkingManager.turnStateSynced);
         onRemotePreviewWinningTeamChanged(networkingManager.previewWinningTeamSynced);
 
+        bool stateIdChanged = (networkingManager.stateIdSynced != stateIdLocal);
+        onRemotePointPocketsChanged(networkingManager.pointPocketsSynced, networkingManager.callShotLockSynced, 
+            stateIdChanged);
+        onRemoteCalledBallsChanged(networkingManager.calledBallsSynced, stateIdChanged);
+        onRemoteNextBallRepositionStateChanged(networkingManager.nextBallRepositionStateSynced);
+
+        Array.Copy(networkingManager.totalPointsSynced, totalPointsLocal, totalPointsLocal.Length);
+        Array.Copy(networkingManager.chainedPointsSynced, chainedPointsLocal, chainedPointsLocal.Length);
+        inningCountLocal = networkingManager.inningCountSynced;
+        Array.Copy(networkingManager.winRackCountSynced, winRackCountLocal, winRackCountLocal.Length);
+#if TKCH_DEBUG_WINRACKCOUNT
+        _LogInfo($"  networkingManager.winRackCountSynced = {networkingManager.winRackCountSynced[0]}-{networkingManager.winRackCountSynced[1]}");
+#endif
+        
         // finally, take a snapshot
         practiceManager._Record();
+
+        stateIdLocal = networkingManager.stateIdSynced;
 
         redrawDebugger();
     }
@@ -706,30 +1018,38 @@ public class BilliardsModule : UdonSharpBehaviour
         }
     }
 
-    private void onRemoteGameSettingsUpdated(uint gameModeSynced, uint timerSynced, bool teamsSynced, bool noGuidelineSynced, bool noLockingSynced)
+    private void onRemoteGameSettingsUpdated(uint gameModeSynced, int goalPointsSynced, uint timerSynced, 
+        bool teamsSynced, bool noGuidelineSynced, bool noLockingSynced, uint rackConditionSynced,
+        bool semiAutoCallBallSynced, bool semiAutoCallPocketSynced)
     {
         if (
             gameModeLocal == gameModeSynced &&
+            goalPointsLocal == goalPointsSynced &&
             timerLocal == timerSynced &&
             teamsLocal == teamsSynced &&
             noGuidelineLocal == noGuidelineSynced &&
-            noLockingLocal == noLockingSynced
+            noLockingLocal == noLockingSynced &&
+            rackConditionLocal == rackConditionSynced &&
+            semiAutoCallBallLocal == semiAutoCallBallSynced &&
+            semiAutoCallPocketLocal == semiAutoCallPocketSynced
         )
         {
             return;
         }
 
-        _LogInfo($"onRemoteGameSettingsUpdated gameMode={gameModeSynced} timer={timerSynced} teams={teamsSynced} guideline={!noGuidelineSynced} locking={!noLockingSynced}");
+        _LogInfo($"onRemoteGameSettingsUpdated gameMode={gameModeSynced} goalPoints={goalPointsSynced} timer={timerSynced} teams={teamsSynced} guideline={!noGuidelineSynced} locking={!noLockingSynced} rackCondition={rackConditionSynced} semiAutoCallBall={semiAutoCallBallSynced} semiAutoCallPocket={semiAutoCallPocketSynced}");
 
-        if (gameModeLocal != gameModeSynced)
+        if (gameModeLocal != gameModeSynced || goalPointsLocal != goalPointsSynced)
         {
             gameModeLocal = gameModeSynced;
+            goalPointsLocal = goalPointsSynced;
 
             is8Ball = gameModeLocal == 0u;
             is9Ball = gameModeLocal == 1u;
             isJp4Ball = gameModeLocal == 2u;
             isKr4Ball = gameModeLocal == 3u;
             is4Ball = isJp4Ball || isKr4Ball;
+            isRotation = gameModeLocal == 4u;
 
             menuManager._RefreshGameMode();
         }
@@ -757,6 +1077,24 @@ public class BilliardsModule : UdonSharpBehaviour
         if (noLockingLocal != noLockingSynced)
         {
             noLockingLocal = noLockingSynced;
+            refreshToggles = true;
+        }
+
+        if (rackConditionLocal != rackConditionSynced)
+        {
+            rackConditionLocal = rackConditionSynced;
+            refreshToggles = true;
+        }
+
+        if (semiAutoCallBallLocal != semiAutoCallBallSynced)
+        {
+            semiAutoCallBallLocal = semiAutoCallBallSynced;
+            refreshToggles = true;
+        }
+
+        if (semiAutoCallPocketLocal != semiAutoCallPocketSynced)
+        {
+            semiAutoCallPocketLocal = semiAutoCallPocketSynced;
             refreshToggles = true;
         }
 
@@ -813,6 +1151,10 @@ public class BilliardsModule : UdonSharpBehaviour
         {
             onRemoteGameEnded(networkingManager.winningTeamSynced);
         }
+        else if (gameStateSynced == 4) // continue next break
+        {
+            onRemoteGameStarted();
+        }
     }
 
     private void onRemoteLobbyOpened()
@@ -856,6 +1198,11 @@ public class BilliardsModule : UdonSharpBehaviour
 
         menuManager._DisableMenu();
 
+        if (isRotation)
+        {
+            graphicsManager._SetUSColors(true);
+            // graphicsManager._UpdateTeamColor(teamIdLocal);
+        }
         graphicsManager._OnGameStarted();
         desktopManager._OnGameStarted();
         applyCueAccess(false);
@@ -870,12 +1217,21 @@ public class BilliardsModule : UdonSharpBehaviour
         auto_pocketblockers.SetActive(is4Ball);
         marker9ball.SetActive(is9Ball);
 
+        afterBreak = false;
+        targetPocketedLocal = 0x0u;
+        otherPocketedLocal = 0x0u;
+
         graphicsManager._ShowBalls();
 
         // Reflect game state
         graphicsManager._UpdateScorecard();
         isReposition = false;
         markerObj.SetActive(false);
+        markerHeadSpot.SetActive(false);
+        markerCenterSpot.SetActive(false);
+        markerFootSpot.SetActive(false);
+        requestBreakOrange.SetActive(false);
+        requestBreakBlue.SetActive(false);
 
         // Effects
         graphicsManager._PlayIntroAnimation();
@@ -887,7 +1243,7 @@ public class BilliardsModule : UdonSharpBehaviour
 
         reflection_main.RenderProbe();
 
-        activeCue = cueControllers[0];
+        activeCue = cueControllers[isPracticeMode ? 0 : (int)networkingManager.teamIdSynced];
     }
 
     private void onRemoteBallPositionsChanged(Vector3[] ballsPSynced)
@@ -966,6 +1322,7 @@ public class BilliardsModule : UdonSharpBehaviour
         this.transform.Find("intl.controls/undo").gameObject.SetActive(false);
         this.transform.Find("intl.controls/redo").gameObject.SetActive(false);
         this.transform.Find("intl.controls/skipturn").gameObject.SetActive(false);
+        this.transform.Find("intl.controls/callShotLock").gameObject.SetActive(false);
 
         // Remove any access rights
         localPlayerId = -1;
@@ -981,7 +1338,7 @@ public class BilliardsModule : UdonSharpBehaviour
         infReset.text = "Reset";
     }
 
-    private void onRemoteBallsPocketedChanged(uint ballsPocketedSynced)
+    private void onRemoteBallsPocketedChanged(uint ballsPocketedSynced, uint targetPocketedSynced, uint otherPocketedSynced)
     {
         if (!gameLive) return;
 
@@ -989,6 +1346,8 @@ public class BilliardsModule : UdonSharpBehaviour
         if (ballsPocketedLocal != ballsPocketedSynced) _LogInfo($"onRemoteBallsPocketedChanged ballsPocketed={ballsPocketedSynced:X}");
 
         ballsPocketedLocal = ballsPocketedSynced;
+        targetPocketedLocal = targetPocketedSynced;
+        otherPocketedLocal = otherPocketedSynced;
 
         graphicsManager._UpdateScorecard();
         graphicsManager._RackBalls();
@@ -1067,7 +1426,12 @@ public class BilliardsModule : UdonSharpBehaviour
         _LogInfo($"onRemoteRepositionStateChanged repositionState={repositionStateSynced}");
         repositionStateLocal = repositionStateSynced;
 
-        if (!isOurTurn() || repositionStateLocal == 0)
+        if (repositionStateLocal == 1 || repositionStateLocal == 3)
+        {
+            afterBreak = false;
+        }
+
+        if (!isOurTurn() || repositionStateLocal == 0 || repositionStateLocal == 3)
         {
             isReposition = false;
             setFoulPickupEnabled(false);
@@ -1077,17 +1441,35 @@ public class BilliardsModule : UdonSharpBehaviour
         if (repositionStateLocal == 1 || repositionStateLocal == 2)
         {
             isReposition = true;
-            if (repositionStateLocal == 1)
+            if (repositionStateLocal == 1 || isRotation)
             {
+#if TKCH_DEBUG_BREAKING_FOUL
+                _LogInfo("  repoMaxX = -k_SPOT_POSITION_X");
+#endif
                 repoMaxX = -k_SPOT_POSITION_X;
             }
             else
             {
+#if TKCH_DEBUG_BREAKING_FOUL
+                _LogInfo("  repoMaxX = k_pR.x");
+#endif
                 Vector3 k_pR = (Vector3)currentPhysicsManager.GetProgramVariable("k_pR");
                 repoMaxX = k_pR.x;
             }
             setFoulPickupEnabled(true);
         }
+    }
+
+    private void onRemoteNextBallRepositionStateChanged(uint nextBallRepositionStateSynced)
+    {
+        if (!gameLive) return;
+
+        if (nextBallRepositionStateLocal == nextBallRepositionStateSynced) return;
+
+        _LogInfo($"onRemoteNextBallRepositionStateChanged nextBallRepositionState={nextBallRepositionStateSynced}");
+        nextBallRepositionStateLocal = nextBallRepositionStateSynced;
+
+        _UpdateNextBallRepositionSpotMarker();
     }
 
     private void onRemoteTurnBegin(int timerStartSynced)
@@ -1099,6 +1481,12 @@ public class BilliardsModule : UdonSharpBehaviour
         enablePlayComponents();
         Array.Clear(ballsV, 0, ballsV.Length);
         Array.Clear(ballsW, 0, ballsW.Length);
+
+        graphicsManager._UpdatePointPocketMarker(pointPocketsLocal, callShotLockLocal);
+        // calledBallId = -2;
+        // calledPocketId = -2;
+        // semiAutoCalledBall = false;
+        // semiAutoCalledPocket = false;
     }
 
     private void onRemoteTurnSimulate(Vector3 cueBallV, Vector3 cueBallW, string simulationOwner)
@@ -1121,9 +1509,14 @@ public class BilliardsModule : UdonSharpBehaviour
         firstHit = 0;
         secondHit = 0;
         thirdHit = 0;
+        cushionAfterFirstHit = 0;
+        cushionObjectiveBallsOnBreak = 0x0u;
+        noCushionLocal = false;
         fbMadePoint = false;
         fbMadeFoul = false;
         ballsPocketedOrig = ballsPocketedLocal;
+        targetPocketedOrig = targetPocketedLocal;
+        otherPocketedOrig = otherPocketedLocal;
         if (Networking.LocalPlayer.displayName == simulationOwner)
         {
             isLocalSimulationOurs = true;
@@ -1161,11 +1554,58 @@ public class BilliardsModule : UdonSharpBehaviour
             onRemoteTurnSimulate(networkingManager.cueBallVSynced, networkingManager.cueBallWSynced, networkingManager.simulationOwnerSynced);
             // practiceManager._Record();
         }
+        else if (turnStateLocal == 3) // choice options after foul
+        {
+            turnStateLocal = 0; // synthetic state
+            onRemoteTurnBegin(networkingManager.timerStartSynced);
+        }
         else
         {
             canPlayLocal = false;
             disablePlayComponents();
         }
+    }
+    
+    private void onRemotePointPocketsChanged(uint pointPocketsSynced, bool callShotLockSynced, bool stateIdChanged)
+    {
+        if (!gameLive) return;
+
+        if (pointPocketsLocal == pointPocketsSynced && callShotLockLocal == callShotLockSynced && 0 < stateIdLocal ) return;
+
+        _LogInfo($"onRemotePointPocketsChanged pointPockets={pointPocketsSynced:X2}, callShotLock={callShotLockSynced}");
+        pointPocketsLocal = pointPocketsSynced;
+        callShotLockLocal = callShotLockSynced;
+        graphicsManager._UpdatePointPocketMarker(pointPocketsLocal, callShotLockLocal);
+        if (!stateIdChanged)
+        {
+            aud_main.PlayOneShot(snd_btn);
+        }
+        // else
+        // {
+        //     calledPocketId = -2;
+        //     semiAutoCalledPocket = false;
+        // }
+        
+        _UpdateNextBallRepositionSpotMarker();
+    }
+
+    private void onRemoteCalledBallsChanged(uint calledBallsSynced, bool stateIdChanged)
+    {
+        if (!gameLive) return;
+
+        if (calledBallsLocal == calledBallsSynced && 0 < stateIdLocal) return;
+
+        _LogInfo($"onRemoteCalledBallsChanged calledBalls={calledBallsSynced:X4}");
+        calledBallsLocal = calledBallsSynced;
+        if (!stateIdChanged)
+        {
+            aud_main.PlayOneShot(snd_btn);
+        }
+        // else
+        // {
+        //     calledBallId = -2;
+        //     semiAutoCalledBall = false;
+        // }
     }
     #endregion
 
@@ -1232,10 +1672,47 @@ public class BilliardsModule : UdonSharpBehaviour
                     break;
                 }
                 break;
+            case 4:
+                if (firstHit == 0)
+                {
+                    firstHit = dstId;
+                }
+                break;
         }
     }
 
-    public void _TriggerPocketBall(int id)
+    public void _TriggerCushion(int id, Vector3 pos)
+    {
+        if (ballsPocketedLocal == ballsPocketedOrig)
+        {
+            if (!afterBreak) //networkingManager.stateIdSynced == 2)
+            {
+                if (0 < id)
+                {
+                    uint ball_bit = 0x1u << id;
+                    if (0 == (cushionObjectiveBallsOnBreak & ball_bit))
+                    {
+                        int cushionBallCount = (int)SoftwareFallback(cushionObjectiveBallsOnBreak);
+                        if (cushionBallCount < 4)
+                        {
+                            graphicsManager._SpawnCushionTouch(pos, cushionBallCount);
+                        }
+                        cushionObjectiveBallsOnBreak |= ball_bit;
+                    }
+                }
+            }
+            else if (0 != firstHit)
+            {
+                if (0 == cushionAfterFirstHit)
+                {
+                    graphicsManager._SpawnCushionTouch(pos, 0);
+                }
+                cushionAfterFirstHit++;
+            }
+        }
+    }
+
+    public void _TriggerPocketBall(int id, int pocketId)
     {
         uint total = 0U;
 
@@ -1254,13 +1731,47 @@ public class BilliardsModule : UdonSharpBehaviour
         uint bmask = 0x1FCU << ((int)(teamIdLocal ^ teamColorLocal) * 7);
 
         // Good pocket
-        if (((0x1U << id) & ((bmask) | (isTableOpenLocal ? 0xFFFCU : 0x0000U) | ((bmask & ballsPocketedLocal) == bmask ? 0x2U : 0x0U))) > 0)
+        if (isRotation)
         {
-            graphicsManager._FlashTableLight();
+            uint pointPockets = pointPocketsLocal & (0x1u << pocketId);
+            if ((calledBallsLocal & (0x1u << id)) != 0 && 
+                pointPockets != 0)
+            {
+                targetPocketedLocal |= 1U << id;
+                graphicsManager._FlashTableLight();
+
+                if (0 == (ballsPocketedLocal & 0x1u))
+                {
+                    // aud_main.PlayOneShot(snd_PointMade, 1.0f);
+                    // graphicsManager._SpawnOnePocketPoint(pcketLocations[pocketId], true, (int)(teamIdLocal ^ teamColorLocal ^ 0x1U));
+                }
+
+                calledBallsLocal = 0;
+            }
+            else
+            {
+                if (0 == id)
+                {
+                    // aud_main.PlayOneShot(snd_PointMade, 1.0f);
+                    // graphicsManager._SpawnOnePocketPoint((pocketId < 0 ? balls[id].transform.localPosition : pcketLocations[pocketId]), false, -1);
+                }
+                else
+                {
+                    otherPocketedLocal |= 1U << id;
+                }
+                graphicsManager._FlashTableError();
+            }
         }
         else
         {
-            graphicsManager._FlashTableError();
+            if (((0x1U << id) & ((bmask) | (isTableOpenLocal ? 0xFFFCU : 0x0000U) | ((bmask & ballsPocketedLocal) == bmask ? 0x2U : 0x0U))) > 0)
+            {
+                graphicsManager._FlashTableLight();
+            }
+            else
+            {
+                graphicsManager._FlashTableError();
+            }
         }
         aud_main.PlayOneShot(snd_Sink, 1.0f);
 
@@ -1328,6 +1839,10 @@ public class BilliardsModule : UdonSharpBehaviour
                deferLossCondition
             ;
 
+            bool repositionOnFoul = true;
+            bool winnerBreak = true;
+            bool reBreakAllowed = false;
+
             if (is8Ball)
             {
                 isObjectiveSink = (ballsPocketedLocal & bmask) > (ballsPocketedOrig & bmask);
@@ -1373,6 +1888,109 @@ public class BilliardsModule : UdonSharpBehaviour
 
                 // TODO: Implement rail contact requirement
             }
+            else if (isRotation)
+            {
+                bool isWrongHit = !(findLowestUnpocketedBall(ballsPocketedOrig) == firstHit);
+                bool isNoTouch = firstHit <= 0;
+
+                bool isAnyPocketSink = (ballsPocketedLocal & rotation_pocket_mask) > (ballsPocketedOrig & rotation_pocket_mask);
+                
+                bool isNoCushon = !isAnyPocketSink && (
+                                  // (!afterBreak && (SoftwareFallback(cushionObjectiveBallsOnBreak) < 4)) ||
+                                   (afterBreak && cushionAfterFirstHit == 0));
+                
+                reBreakAllowed = !isAnyPocketSink && 
+                                 !afterBreak && (SoftwareFallback(cushionObjectiveBallsOnBreak) < 4);
+
+                foulCondition = isScratch || isWrongHit || isNoTouch || isNoCushon;
+                isObjectiveSink = (targetPocketedLocal & rotation_pocket_mask) > (targetPocketedOrig & rotation_pocket_mask);
+                isOpponentSink = (otherPocketedLocal & rotation_pocket_mask) > (otherPocketedOrig & rotation_pocket_mask);
+                if (isObjectiveSink || !afterBreak)
+                {
+                    isOpponentSink = false;
+                }
+
+                if (isScratch)
+                {
+                    ballsP[0] = initialPositions[gameModeLocal][0];
+                }
+                else if (isNoTouch || isNoCushon)
+                {
+                    noCushionLocal = true;
+                }
+                
+                deferLossCondition = false;
+                
+                uint ballsPocketedCurrent = ballsPocketedLocal & ~ballsPocketedOrig;
+
+                int point = 0;
+                if (isObjectiveSink || !afterBreak)
+                {
+                    for (int i = 1; i < balls.Length; i++)
+                    {
+                        if (0 < ((ballsPocketedCurrent >> i) & 0x1u))
+                        {
+                            int ballNumber = i == 1 ? 8 : (i < 9 ? i - 1 : i);
+                            point += ballNumber;
+                        }
+                    }
+                }
+                
+                if (isOpponentSink || foulCondition)
+                {
+                    int uponBallsCount = pocketedballUponPool(ballsPocketedCurrent, k_SPOT_POSITION_X, break_order_rotation.Length);
+                    if (uponBallsCount <= 0)
+                    {
+                        pocketedballUponPool(ballsPocketedCurrent, 0, break_order_rotation.Length);
+                    }
+                }
+                else
+                {
+                    totalPointsLocal[teamIdLocal] += point;
+                    if (255 < totalPointsLocal[teamIdLocal]) {totalPointsLocal[teamIdLocal] = 255;}
+                    chainedPointsLocal[teamIdLocal] += point;
+                    if (255 < chainedPointsLocal[teamIdLocal]) {chainedPointsLocal[teamIdLocal] = 255;}
+                }
+
+                winCondition = (ballsPocketedLocal & rotation_pocket_mask) == rotation_pocket_mask;
+                if (winCondition)
+                {
+                    float kitcyen_x = -k_SPOT_POSITION_X;
+#if TKCH_DEBUG_IN_KITCHEN
+                    _LogInfo($"  ballsP[0].x = {ballsP[0].x} < kitcyen_x = {kitcyen_x}");
+#endif
+                    winnerBreak = ballsP[0].x < kitcyen_x;
+                    
+                    winRackCountLocal[teamIdLocal]++;
+#if TKCH_DEBUG_WINRACKCOUNT
+                    _LogInfo($"  winRackCountLocal = {winRackCountLocal[0]}-{winRackCountLocal[1]}");
+#endif
+                }
+
+                // if (foulCondition || deferLossCondition || !isObjectiveSink || isOpponentSink)
+                if (point == 0)
+                {
+                    chainedPointsLocal[teamIdLocal] = 0;
+                }
+ 
+                UpdateScoreSyncRowsByFlags(!foulCondition, foulCondition);
+                
+                if (foulCondition && !isScratch && (isNoTouch || isNoCushon || isWrongHit))
+                {
+                    repositionOnFoul = false;
+                }
+                
+                if (isScratch)
+                {
+                    // next ballがkitchen内の場合はセンターに移動させる
+                    checkNextInKitchenThenMoveToCenter();
+                }
+                
+                if (!afterBreak && 0 < point)
+                {
+                    isObjectiveSink = true;
+                }
+            }
             else /*if (is4Ball)*/
             {
                 isObjectiveSink = fbMadePoint;
@@ -1382,31 +2000,45 @@ public class BilliardsModule : UdonSharpBehaviour
 
                 winCondition = fbScoresLocal[teamIdLocal] >= 10;
             }
+            
+            afterBreak = true;
+            calledBallId = -2;
+            calledPocketId = -2;
+            semiAutoCalledBall = false;
+            semiAutoCalledPocket = false;
 
-            networkingManager._OnSimulationEnded(ballsP, ballsPocketedLocal, fbScoresLocal);
+            networkingManager._OnSimulationEnded(ballsP, ballsPocketedLocal, targetPocketedLocal, otherPocketedLocal, 
+                fbScoresLocal, totalPointsLocal, chainedPointsLocal, 
+                noCushionLocal, inningCountLocal, winRackCountLocal);
+
+            if (isRotation && goalPointsLocal <= networkingManager.totalPointsSynced[teamIdLocal])
+            {
+                onMatchWin();
+                return;
+            }
 
             if (winCondition)
             {
                 if (foulCondition)
                 {
                     // Loss
-                    onLocalTeamWin(teamIdLocal ^ 0x1U);
+                    onLocalTeamWin(teamIdLocal ^ 0x1U, winnerBreak);
                 }
                 else
                 {
                     // Win
-                    onLocalTeamWin(teamIdLocal);
+                    onLocalTeamWin(teamIdLocal, winnerBreak);
                 }
             }
             else if (deferLossCondition)
             {
                 // Loss
-                onLocalTeamWin(teamIdLocal ^ 0x1U);
+                onLocalTeamWin(teamIdLocal ^ 0x1U, winnerBreak);
             }
             else if (foulCondition)
             {
                 // Foul
-                onLocalTurnFoul();
+                onLocalTurnFoul(false, repositionOnFoul, reBreakAllowed);
             }
             else if (isObjectiveSink && !isOpponentSink)
             {
@@ -1416,8 +2048,16 @@ public class BilliardsModule : UdonSharpBehaviour
             else
             {
                 // Pass
-                onLocalTurnPass();
+                onLocalTurnPass(reBreakAllowed);
             }
+        }
+        else
+        {
+            afterBreak = true;
+            calledBallId = -2;
+            calledPocketId = -2;
+            semiAutoCalledBall = false;
+            semiAutoCalledPocket = false;
         }
     }
     #endregion
@@ -1425,7 +2065,7 @@ public class BilliardsModule : UdonSharpBehaviour
     #region GameLogic
     private void initializeRack()
     {
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < initialPositions.Length; i++)
         {
             initialPositions[i] = new Vector3[16];
             for (int j = 0; j < 16; j++)
@@ -1488,6 +2128,24 @@ public class BilliardsModule : UdonSharpBehaviour
             initialBallsPocketed[3] = initialBallsPocketed[2];
             initialPositions[3] = initialPositions[2];
         }
+        
+        {
+            // rotation
+            initialBallsPocketed[4] = 0x00u;
+
+            for (int i = 0, k = 0; i < 5; i++)
+            {
+                for (int j = 0; j <= i; j++)
+                {
+                    initialPositions[4][break_order_rotation[k++]] = new Vector3
+                    (
+                        k_SPOT_POSITION_X + i * k_BALL_PL_Y + (rackConditionLocal == 0 ? 0 : UnityEngine.Random.Range(-k_RANDOMIZE_F, k_RANDOMIZE_F)),
+                        0.0f,
+                        (-i + j * 2) * k_BALL_PL_X + (rackConditionLocal == 0 ? 0 : UnityEngine.Random.Range(-k_RANDOMIZE_F, k_RANDOMIZE_F))
+                    );
+                }
+            }
+        }
     }
 
     private void resetCachedData()
@@ -1530,6 +2188,15 @@ public class BilliardsModule : UdonSharpBehaviour
         auto_pocketblockers = table_base.Find(".4BALL_FILL").gameObject;
         auto_rackPosition = table_base.Find(".RACK").gameObject;
         auto_colliderBaseVFX = table_base.Find("collision.vfx").gameObject;
+
+        pointPocketMarkers = new GameObject[6];
+        pointPocketMarkerSphere = new GameObject[pointPocketMarkers.Length];
+        for (int i = 0; i < pointPocketMarkers.Length; i++)
+        {
+            Transform pointPocketMarker = table_base.Find($"PointPocketMarker_{i}");
+            pointPocketMarkers[i] = pointPocketMarker.gameObject;
+            pointPocketMarkerSphere[i] = pointPocketMarker.Find("Sphere").gameObject;
+        }
 
         Transform transformSurface = (Transform)currentPhysicsManager.GetProgramVariable("transform_Surface");
         k_rack_position = transformSurface.InverseTransformPoint(auto_rackPosition.transform.position);
@@ -1610,9 +2277,42 @@ public class BilliardsModule : UdonSharpBehaviour
         if (fbScoresLocal[teamIdLocal] < 0) fbScoresLocal[teamIdLocal] = 0;
     }
 
-    private void onLocalTeamWin(uint winner)
+    private void onMatchWin()
+    {
+        _LogInfo($"onMatchWin {(teamIdLocal)}");
+
+        if (string.IsNullOrEmpty(tournamentRefereeLocal))
+        {
+            networkingManager._OnGameWin(teamIdLocal);
+        }
+        else
+        {
+            networkingManager._OnPreviewWinner(teamIdLocal);
+        }
+    }
+
+    private void onLocalTeamWin(uint winner, bool winnerBreak)
     {
         _LogInfo($"onLocalTeamWin {(winner)}");
+
+        if (isRotation)
+        {
+            if (teamIdLocal != 0 && teamIdLocal != winner)
+            {
+                networkingManager.inningCountSynced++;
+            }
+            // networkingManager.winRackCountSynced[winner]++;
+            initializeRack();
+            if (winnerBreak)
+            {
+                initialPositions[gameModeLocal][0] = ballsP[0];
+            }
+            networkingManager._OnGameNextBreak(
+                initialBallsPocketed[gameModeLocal], initialPositions[gameModeLocal], 
+                (winnerBreak ? winner : winner ^ 0x1U), 
+                (winnerBreak ? 3 : 1));
+            return;                
+        }
 
         if (string.IsNullOrEmpty(tournamentRefereeLocal))
         {
@@ -1624,18 +2324,49 @@ public class BilliardsModule : UdonSharpBehaviour
         }
     }
 
-    private void onLocalTurnPass()
+    private void onLocalTurnPass(bool reBreakAllowed)
     {
         _LogInfo($"onLocalTurnPass");
 
-        networkingManager._OnTurnPass(teamIdLocal ^ 0x1u);
+        if (teamIdLocal != 0)
+        {
+            networkingManager.inningCountSynced++;
+        }
+
+        networkingManager._OnTurnPass(teamIdLocal ^ 0x1u, reBreakAllowed);
     }
 
-    private void onLocalTurnFoul()
+    private void onLocalTurnFoul(bool isTimeEnd, bool reposition, bool reBreakAllowed)
     {
         _LogInfo($"onLocalTurnFoul");
 
-        networkingManager._OnTurnFoul(teamIdLocal ^ 0x1u);
+        if (teamIdLocal != 0)
+        {
+            networkingManager.inningCountSynced++;
+        }
+
+        if (isRotation)
+        {
+            if (isTimeEnd)
+            {
+                Array.Copy(ballsP, networkingManager.ballsPSynced, ballsP.Length);
+                Array.Copy(totalPointsLocal, networkingManager.totalPointsSynced, totalPointsLocal.Length);
+                Array.Copy(chainedPointsLocal, networkingManager.chainedPointsSynced, chainedPointsLocal.Length);
+                networkingManager.ballsPocketedSynced = ballsPocketedLocal;
+                networkingManager.targetPocketedSynced = targetPocketedLocal;
+                networkingManager.otherPocketedSynced = otherPocketedLocal;
+                networkingManager.noCushionSynced = noCushionLocal;
+                networkingManager._OnTurnFoul(teamIdLocal ^ 0x1u, false, true, reBreakAllowed);
+                return;
+            }
+            else
+            {
+                networkingManager._OnTurnFoul(teamIdLocal ^ 0x1u, reposition, true, reBreakAllowed);
+                return;
+            }
+        }
+
+        networkingManager._OnTurnFoul(teamIdLocal ^ 0x1u, reposition, false, false);
     }
 
     private void onLocalTurnContinue()
@@ -1697,8 +2428,17 @@ public class BilliardsModule : UdonSharpBehaviour
 
             if (isOurTurn())
             {
+                bool reposition = true;
+                if (isRotation)
+                {
+                    reposition = false;
+                    noCushionLocal = true;
+                }
+                
+                UpdateScoreSyncRowsByFlags(false, true);
+
                 // everyone on the current team propagates the change
-                onLocalTurnFoul();
+                onLocalTurnFoul(true, reposition, !afterBreak);
             }
         }
     }
@@ -1742,11 +2482,22 @@ public class BilliardsModule : UdonSharpBehaviour
             this.transform.Find("intl.controls/skipturn").gameObject.SetActive(true);
         }
 
-        if (is9Ball)
+        if (is9Ball || isRotation)
         {
             marker9ball.SetActive(true);
             _Update9BallMarker();
         }
+
+        if (isRotation && isOurTurnVar)
+        {
+            this.transform.Find("intl.controls/callShotLock").gameObject.SetActive(true);
+        }
+        else
+        {
+            this.transform.Find("intl.controls/callShotLock").gameObject.SetActive(false);
+        }
+
+        markerCalledBall.SetActive(false);
 
         refreshBallPickups();
 
@@ -1771,16 +2522,189 @@ public class BilliardsModule : UdonSharpBehaviour
     {
         if (isPracticeMode || (!string.IsNullOrEmpty(tournamentRefereeLocal) && _IsLocalPlayerReferee()))
         {
-            onLocalTurnFoul();
+            onLocalTurnFoul(false, true, true);
         }
     }
 
+    public void _CallShotLock()
+    {
+        networkingManager._OnCallShotLockChanged(!callShotLockLocal);
+        //callShotLockLocal = !callShotLockLocal;
+        //graphicsManager._UpdatePointPocketMarker(pointPocketsLocal, callShotLockLocal);
+    }
+    
+    public void _NextBallOnSpot(float x)
+    {
+        int target = findLowestUnpocketedBall(ballsPocketedLocal);
+        //ballsP[target] = new Vector3(x, 0.0f, 0.0f);
+        pocketedballUponPool(0x1u << target, x, break_order_rotation.Length);
+        
+        networkingManager.nextBallRepositionStateSynced = (byte)(nextBallRepositionStateLocal & ~0x1u);
+        networkingManager._OnRepositionBalls(ballsP, false);
+    }
+
+    public void _RequestBreak(uint teamId)
+    {
+#if TKCH_DEBUG_BREAKING_FOUL
+        _LogInfo($"TKCH BilliardsModule::_RequestBreak(teamId = {teamId})");
+#endif
+         if (teamIdLocal == 0 && teamIdLocal == teamId)
+         {
+#if TKCH_DEBUG_BREAKING_FOUL
+             _LogInfo("  inning count down");
+#endif
+             networkingManager.inningCountSynced--;
+         }
+        initializeRack();
+        networkingManager._OnGameNextBreak(
+            initialBallsPocketed[gameModeLocal], initialPositions[gameModeLocal], 
+            teamId, 1);
+    }
+
+    public void _CueBallInKitchen()
+    {
+        // next ballがkitchen内の場合はセンターに移動させる
+        checkNextInKitchenThenMoveToCenter();
+        
+        ballsP[0] = initialPositions[gameModeLocal][0];
+        networkingManager.repositionStateSynced = 2; // 1
+        networkingManager.nextBallRepositionStateSynced = (byte)(nextBallRepositionStateLocal & ~0x2u);
+        networkingManager._OnRepositionBalls(ballsP, false);
+    }
+
+    private void checkNextInKitchenThenMoveToCenter()
+    {
+#if TKCH_DEBUG_IN_KITCHEN
+        _LogInfo("TKCH BilliardsModule::checkNextInKitchenThenMoveToCenter()");
+#endif
+        int target = findLowestUnpocketedBall(ballsPocketedLocal);
+        float kitcyen_x = -k_SPOT_POSITION_X;
+#if TKCH_DEBUG_IN_KITCHEN
+        _LogInfo($"  ballsP[{target}].x = {ballsP[target].x} < kitcyen_x = {kitcyen_x}");
+#endif
+        if (ballsP[target].x < kitcyen_x)
+        {
+            // next ballがkitchen内の場合はセンターに移動させる
+            //ballsP[target] = new Vector3(0.0f, 0.0f, 0.0f);
+            pocketedballUponPool(0x1u << target, 0, break_order_rotation.Length);
+        }
+    }
+    
     public void _Update9BallMarker()
     {
         if (marker9ball.activeSelf)
         {
             int target = findLowestUnpocketedBall(ballsPocketedLocal);
             marker9ball.transform.localPosition = ballsP[target];
+            //_UpdateCalledBallMarker(target);
+        }
+        // else
+        // {
+        //     _UpdateCalledBallMarker(-1);
+        // }
+    }
+
+    public void _UpdateCalledBallMarker(/* int lowestUnpocketedBallId */)
+    {
+        if (!gameLive)
+        {
+            return;
+        }
+
+        if (!isRotation)
+        {
+            return;
+        }
+
+        if (calledBallsLocal == 0)
+        {
+            markerCalledBall.SetActive(false);
+        }
+        
+        int target = 0;
+        uint ball_bit = 0x2u;
+        for (int k = 0; k < break_order_rotation.Length; k++)
+        {
+            int i = k + 1;
+            if ((calledBallsLocal & ball_bit) != 0x0u)
+            {
+                target = i;
+            }                
+            ball_bit <<= 1;
+        }
+
+        if (0 < target)
+        {
+            bool callShotLock = callShotLockLocal && turnStateLocal != 1;
+            markerCalledBall.GetComponent<MeshRenderer>().material = callShotLock ? calledBallMarkerWhite :
+                ((teamIdLocal ^ teamColorLocal) == 0 ? calledBallMarkerBlue : calledBallMarkerOrange);
+            markerCalledBall.transform.localPosition = ballsP[target];
+            markerCalledBall.SetActive(true);
+        }
+        else
+        {
+            markerCalledBall.SetActive(false);
+        }
+
+        // if (!isLocalSimulationRunning)
+        // {
+        //     if (target == lowestUnpocketedBallId)
+        //     {
+        //         marker9ball.SetActive(false);
+        //     }
+        //     else
+        //     {
+        //         marker9ball.SetActive(true);
+        //     }
+        // }
+    }
+
+    public void _UpdateCalledPocketMarker()
+    {
+        graphicsManager._UpdatePointPocketMarker(pointPocketsLocal, false);
+    }
+    
+    public void _UpdateNextBallRepositionSpotMarker()
+    {
+        if (!isOurTurn() || nextBallRepositionStateLocal == 0 || callShotLockLocal)
+        {
+            markerHeadSpot.SetActive(false);
+            markerCenterSpot.SetActive(false);
+            markerFootSpot.SetActive(false);
+            requestBreakOrange.SetActive(false);
+            requestBreakBlue.SetActive(false);
+            return;
+        }
+
+        if ((nextBallRepositionStateLocal & 0x1u) > 0 )
+        {
+            markerCenterSpot.SetActive(true);
+            markerFootSpot.SetActive(true);
+        }
+        else
+        {
+            markerCenterSpot.SetActive(false);
+            markerFootSpot.SetActive(false);
+        }
+        
+        if ((nextBallRepositionStateLocal & 0x2u) > 0 /* || repositionStateLocal == 0 */)
+        {
+            markerHeadSpot.SetActive(true);
+        }
+        else
+        {
+            markerHeadSpot.SetActive(false);
+        }
+        
+        if ((nextBallRepositionStateLocal & 0x4u) > 0 )
+        {
+            requestBreakOrange.SetActive(true);
+            requestBreakBlue.SetActive(true);
+        }
+        else
+        {
+            requestBreakOrange.SetActive(false);
+            requestBreakBlue.SetActive(false);
         }
     }
 
@@ -1818,6 +2742,47 @@ public class BilliardsModule : UdonSharpBehaviour
 
         // ??
         return 0;
+    }
+
+    public int findNearestPocketFromBall(int ballId)
+    {
+        int pocketId = -1;
+        Vector3 ballPos = ballsP[ballId];
+        float abs_x = Mathf.Abs(ballPos.x);
+        float abs_z_n = Mathf.Abs(ballPos.z) * findNearestPocket_n;
+        bool nearSide = (abs_x + abs_z_n < findNearestPocket_x);
+        if (ballPos.z < 0)
+        {
+            if (nearSide)
+            {
+                pocketId = 5;
+            }
+            else if (ballPos.x < 0)
+            {
+                pocketId = 3;
+            }
+            else
+            {
+                pocketId = 1;
+            }
+        }
+        else
+        {
+            if (nearSide)
+            {
+                pocketId = 4;
+            }
+            else if (ballPos.x < 0)
+            {
+                pocketId = 2;
+            }
+            else
+            {
+                pocketId = 0;
+            }
+        }
+
+        return pocketId;
     }
 
     private void setBallPickupActive(int ballId, bool active)
@@ -1874,6 +2839,42 @@ public class BilliardsModule : UdonSharpBehaviour
             if (timeRemaining < 0.0f)
             {
                 onLocalTimerEnd();
+            }
+        }
+
+        if (isRotation && gameLive && canPlayLocal && afterBreak)
+        {
+            int target = findLowestUnpocketedBall(ballsPocketedLocal);
+            if (0 < target)
+            {
+                // bool isDesktopUser = ReferenceEquals(null, Networking.LocalPlayer) ? false : !Networking.LocalPlayer.IsUserInVR();
+                float elapsedSeconds = (Networking.GetServerTimeInMilliseconds() - timerStartLocal) / 1000.0f;
+                
+#if TKCH_DEBUG_SEMIAUTO_CALL
+                if (0.1f < elapsedSeconds && elapsedSeconds < 0.12f)
+                {
+                    _LogInfo($"  semiAutoCalledBall = {semiAutoCalledBall}, calledBallId = {calledBallId}, target = {target}");
+                }
+#endif
+
+                if (semiAutoCallBallLocal && !semiAutoCalledBall && calledBallId < 0)
+                {
+                    if (0.4f < elapsedSeconds)
+                    {
+                        _TriggerOtherBallHit(target, true);
+                        semiAutoCalledBall = true;
+                    }
+                }
+            
+                if (semiAutoCallPocketLocal && !semiAutoCalledPocket && calledPocketId < 0)
+                {
+                    if (0.8f < elapsedSeconds)
+                    {
+                        int pocketId = findNearestPocketFromBall(target);
+                        _TriggerPocketHit(pocketId, true);
+                        semiAutoCalledPocket = true;
+                    }
+                }
             }
         }
     }
@@ -1970,10 +2971,13 @@ public class BilliardsModule : UdonSharpBehaviour
         Array.Copy(ballsP, positionClone, ballsP.Length);
         int[] scoresClone = new int[fbScoresLocal.Length];
         Array.Copy(fbScoresLocal, scoresClone, fbScoresLocal.Length);
-        return new object[13]
+        int[] pointsClone = new int[totalPointsLocal.Length];
+        Array.Copy(totalPointsLocal, pointsClone, totalPointsLocal.Length);
+        return new object[19]
         {
             positionClone, ballsPocketedLocal, scoresClone, gameModeLocal, teamIdLocal, repositionStateLocal, isTableOpenLocal, teamColorLocal, fourBallCueBallLocal,
-            turnStateLocal, networkingManager.cueBallVSynced, networkingManager.cueBallWSynced, networkingManager.previewWinningTeamSynced
+            turnStateLocal, networkingManager.cueBallVSynced, networkingManager.cueBallWSynced, networkingManager.previewWinningTeamSynced, networkingManager.nextBallRepositionStateSynced,
+            targetPocketedLocal, otherPocketedLocal, pointPocketsLocal, calledBallsLocal, pointsClone
         };
     }
 
@@ -1982,7 +2986,8 @@ public class BilliardsModule : UdonSharpBehaviour
         networkingManager._ForceLoadFromState(
             stateIdLocal,
             (Vector3[])state[0], (uint)state[1], (int[])state[2], (uint)state[3], (uint)state[4], (uint)state[5], (bool)state[6], (uint)state[7], (uint)state[8],
-            (byte)state[9], (Vector3)state[10], (Vector3)state[11], (byte)state[12]
+            (byte)state[9], (Vector3)state[10], (Vector3)state[11], (byte)state[12], (byte)state[13],
+            (uint)state[14], (uint)state[15], (byte)state[16], (uint)state[17], (int[])state[18]
         );
     }
 
@@ -1996,7 +3001,11 @@ public class BilliardsModule : UdonSharpBehaviour
         int[] scoresB = (int[])b[2];
         for (int i = 0; i < fbScoresLocal.Length; i++) if (scoresA[i] != scoresB[i]) return false;
 
-        for (int i = 0; i < a.Length; i++) if (i != 0 && i != 2 && !a[i].Equals(b[i])) return false;
+        int[] pointsA = (int[])a[18];
+        int[] pointsB = (int[])b[18];
+        for (int i = 0; i < totalPointsLocal.Length; i++) if (pointsA[i] != pointsB[i]) return false;
+
+        for (int i = 0; i < a.Length; i++) if (i != 0 && i != 2 && i != 18 && !a[i].Equals(b[i])) return false;
 
         return true;
     }
@@ -2065,7 +3074,239 @@ public class BilliardsModule : UdonSharpBehaviour
         }
         return true;
     }
+
+    public static uint SoftwareFallback(uint value)
+    {
+        const uint c1 = 0x55555555u;
+        const uint c2 = 0x33333333u;
+        const uint c3 = 0x0F0F0F0Fu;
+        const uint c4 = 0x01010101u;
+
+        value -= (value >> 1) & c1;
+        value = (value & c2) + ((value >> 2) & c2);
+        value = (((value + (value >> 4)) & c3) * c4) >> 24;
+
+        return value;
+    }
+    
+    private int pocketedballUponPool(uint ballsPocketed, float posX, int safeLimitLoop)
+    {
+#if TKCH_DEBUG_UPON_FOOT
+        _LogInfo("TKCH BilliardsModule::pocketedballUponPool()");
+        _LogInfo($"  ballsPocketed = {ballsPocketed:X4}");
+#endif
+        if (ballsPocketed == 0x0u)
+        {                                                       
+            return -1; // 0x0u;
+        }
+
+        uint uponBalls = 0x0u;
+        int uponBallsCount = 0;
+        uint uponRacks = 0x0u;
+        uint ball_bit = 0x2u;
+        for (int i = 1; i < ballsP.Length; i++)
+        {
+            if ((ballsPocketed & ball_bit) != 0x0u)
+            {
+                Vector3 beforePos = ballsP[i];
+#if TKCH_DEBUG_UPON_FOOT
+                _LogInfo($"  ballsP[{i}] = [{ballsP[i].x},{ballsP[i].y},{ballsP[i].z}]");
+#endif
+                ballsP[i] = //Vector3.zero;
+                new Vector3
+                (
+                    posX,
+                    0.0f,
+                    0.0f
+                );
+                int touching = ballTouching(i);
+#if TKCH_DEBUG_UPON_FOOT
+                _LogInfo($"  touching = {touching}, ballsP[{i}] = [{ballsP[i].x},{ballsP[i].y},{ballsP[i].z}]");
+#endif
+                int limit = safeLimitLoop;
+                while (0 <= touching)
+                {
+#if TKCH_DEBUG_UPON_FOOT
+                    //_LogInfo($"  k_BALL_DIAMETRE = {k_BALL_DIAMETRE}, ballsP[{i}].z = {ballsP[i].z}");
+#endif
+                    // ballsP[i] = new Vector3
+                    // (
+                    //     ballsP[touching].x + k_BALL_DIAMETRE,
+                    //     ballsP[touching].y,
+                    //     ballsP[touching].z
+                    // );
+                    float distanceZ = ballsP[i].z;
+                    float adjustX = Mathf.Sqrt(Mathf.Pow(k_BALL_DIAMETRE, 2f) - Mathf.Pow(distanceZ, 2f));
+#if TKCH_DEBUG_UPON_FOOT
+                    _LogInfo($"  distanceZ = {distanceZ}, adjustX = {adjustX}");
+#endif
+                    ballsP[i] = new Vector3
+                    (
+                        ballsP[touching].x + adjustX,
+                        ballsP[touching].y,
+                        0
+                    );
+                    touching = ballTouching(i);
+#if TKCH_DEBUG_UPON_FOOT
+                    //_LogInfo($"  touching = {touching}, ballsP[{i}] = [{ballsP[i].x},{ballsP[i].y},{ballsP[i].z}]");
+#endif
+                    if (0 < limit)
+                    {
+                        limit--;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
+                if (footCushionTouching(ballsP[i]))
+                {
+                    ballsP[i] = beforePos;
+                    continue;
+                }
+                
+                uponBalls |= ball_bit;
+                uponBallsCount++;
+
+                int rackPosNum = (int)((beforePos.x - k_rack_position.x) / k_BALL_DIAMETRE);
+                uponRacks |= 0x1u << rackPosNum;
+            }
+            ball_bit <<= 1;
+        }
+
+        //targetPocketedLocal[0] &= ~(uponRacks << 24);
+        //pocketedRackLocal &= ~uponRacks;
+#if TKCH_DEBUG_POCKETED_RACK || TKCH_DEBUG_UPON_FOOT
+        //_LogInfo($"  uponRacks = {uponRacks:X4}, targetPocketedLocal[0] = {targetPocketedLocal[0]:X8}");
+        //_LogInfo($"  uponRacks = {uponRacks:X4}, pocketedRackLocal = {pocketedRackLocal:X4}");
+#endif
+
+        targetPocketedLocal &= ~((uponBalls << 16) | (uponBalls & 0xFFFFu));
+        ballsPocketedLocal &= ~uponBalls;
+        otherPocketedLocal &= ~uponBalls;
+        //onePocketNotYetUponLocal -= uponBallsCount;
+        //return uponBalls;
+        if (uponBallsCount <= 0)
+        {
+            _LogWarn("failed to upon " + (posX == 0 ? "center" : (posX == k_SPOT_POSITION_X ? "foot" : $"x = {posX}")) + ". no place to put.");
+        }
+        return uponBallsCount;
+    }
+    
+    private int ballTouching(int n)
+    {
+        for (int i = 0; i < ballsP.Length; i++)
+        {
+            if (i == n)
+            {
+                continue;
+            }
+            if ((ballsP[n] - ballsP[i]).sqrMagnitude < 0.003598f) //k_BALL_DSQR)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private bool footCushionTouching(Vector3 ballPosition)
+    {
+#if TKCH_DEBUG_UPON_FOOT
+        //_LogInfo("TKCH BilliardsModule::footCushionTouching()");
+        //_LogInfo($"  check cusion {k_TABLE_WIDTH} < ball {ballPosition.x + k_BALL_RADIUS}");
+#endif
+        if (k_TABLE_WIDTH < ballPosition.x + k_BALL_RADIUS)
+        {
+            return true;
+        }
+
+        return false;
+    }
     #endregion
+
+    public void UpdateScoreSyncRowsByFlags(bool foulCountClear, bool foulCountIncrement)
+    {
+#if TKCH_DEBUG_WINRACKCOUNT || TKCH_DEBUG_SCORE
+        _LogInfo("TKCH BilliardsModule::UpdateScoreSyncRowsByFlags()");
+#endif
+#if TKCH_DEBUG_WINRACKCOUNT
+        _LogInfo($"  winRackCountLocal = {winRackCountLocal[0]}-{winRackCountLocal[1]}");
+#endif
+        for (int teamId = 0; teamId < 2; teamId++)
+        {
+            uint[] encodeScoreSyncValues = null;
+            if (teamId == teamIdLocal)
+            {
+                int maxChainedPoint = scoreScreen.GetTeamSafeNoPocketShotCount(teamId);
+                if (maxChainedPoint < chainedPointsLocal[teamIdLocal]) {maxChainedPoint = chainedPointsLocal[teamIdLocal];}
+
+                encodeScoreSyncValues = scoreScreen.EncodeScoreParams(
+                    totalPointsLocal[teamId],
+                    (foulCountClear ? 0 : scoreScreen.GetTeamScratchCount(teamId) + (foulCountIncrement ? 1 : 0)),
+                    winRackCountLocal[teamId],
+                    inningCountLocal + 1, // turn count
+                    maxChainedPoint, // high run
+                    0 // no use
+                );
+            }
+            else
+            {
+                encodeScoreSyncValues = scoreScreen.EncodeScoreParams(
+                    scoreScreen.GetTeamPoint(teamId),
+                    scoreScreen.GetTeamScratchCount(teamId),
+                    scoreScreen.GetTeamPocketBallCount(teamId),
+                    scoreScreen.GetTeamShotCount(teamId),
+                    scoreScreen.GetTeamSafeNoPocketShotCount(teamId),
+                    0 // no use
+                );
+                /*
+                encodeScoreSyncValues = scoreScreen.EncodeScoreSyncValues();
+                */
+            }
+            Array.Copy(encodeScoreSyncValues, 0,
+                networkingManager.scoreSyncRows, teamId * 2, 
+                encodeScoreSyncValues.Length);
+        }
+#if TKCH_DEBUG_SCORE
+        _LogInfo($"  networkingManager.scoreSyncRows = {networkingManager.scoreSyncRows[0]:X8}-{networkingManager.scoreSyncRows[1]:X8}");
+        _LogInfo($"                                    {networkingManager.scoreSyncRows[2]:X8}-{networkingManager.scoreSyncRows[3]:X8}");
+#endif
+    }
+    
+    public void UpdateScoreSyncRowsByParams(uint teamId, int[] totalPoints)
+    {
+        for (int i = 0; i < 2; i++)
+        {
+            uint[] encodeScoreSyncValues = null;
+            if (teamId == i)
+            {
+                encodeScoreSyncValues = scoreScreen.EncodeScoreParams(
+                    totalPoints[teamId],
+                    0,
+                    0,
+                    0,
+                    0,
+                    0 // no use
+                );
+            }
+            else
+            {
+                encodeScoreSyncValues = scoreScreen.EncodeScoreParams(
+                    totalPoints[teamId ^ 0x1u],
+                    0,
+                    0,
+                    0,
+                    0,
+                    0 // no use
+                );
+            }
+            Array.Copy(encodeScoreSyncValues, 0,
+                networkingManager.scoreSyncRows, i * 2,
+                encodeScoreSyncValues.Length);
+        }
+    }
 
     #region Debugger
     const string LOG_LOW = "<color=\"#ADADAD\">";

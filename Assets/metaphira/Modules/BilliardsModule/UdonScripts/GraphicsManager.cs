@@ -1,4 +1,5 @@
-﻿
+﻿//#define TKCH_DEBUG_BREAKING_FOUL
+
 using UdonSharp;
 using UnityEngine;
 using UnityEngine.UI;
@@ -8,6 +9,17 @@ using VRC.Udon;
 [UdonBehaviourSyncMode(BehaviourSyncMode.NoVariableSync)]
 public class GraphicsManager : UdonSharpBehaviour
 {
+    [Header("Pocket Billiard Additional")]
+    [SerializeField] GameObject[] cushionTouch;
+    [SerializeField] Material calledPocketBlue;
+    [SerializeField] Material calledPocketOrange;
+    [SerializeField] Material calledPocketSphereBlue;
+    [SerializeField] Material calledPocketSphereOrange;
+    [SerializeField] Material calledPocketSphereWhite;
+    [SerializeField] Material calleShotLockBlue;
+    [SerializeField] Material calleShotLockOrange;
+    [SerializeField] Material calleShotLockWhite;
+
     [Header("4 Ball")]
     [SerializeField] GameObject fourBallPoint;
     [SerializeField] Mesh fourBallMeshPlus;
@@ -48,6 +60,9 @@ public class GraphicsManager : UdonSharpBehaviour
 
     private bool fourBallPointActive;
     private float fourBallPointTime;
+
+    private bool[] cushionTouchActive;
+    private float[] cushionTouchTime;
 
     private float introAnimationTime = 0.0f;
 
@@ -106,6 +121,14 @@ public class GraphicsManager : UdonSharpBehaviour
             meshOverrideRegular[i + 1] = balls[13 + i].GetComponent<MeshFilter>().sharedMesh;
         }
 
+        cushionTouchActive = new bool[cushionTouch.Length];
+        cushionTouchTime = new float[cushionTouch.Length];
+        for (int i = 0; i < cushionTouch.Length; i++)
+        {
+            cushionTouchActive[i] = false;
+            cushionTouchTime[i] = 0;
+        }
+
         _DisableObjects();
     }
 
@@ -123,6 +146,7 @@ public class GraphicsManager : UdonSharpBehaviour
     {
         tickBallPositions();
         tickFourBallPoint();
+        tickCushionTouch();
         tickIntroAnimation();
         tickTableColor();
         tickLobbyStatus();
@@ -175,6 +199,41 @@ public class GraphicsManager : UdonSharpBehaviour
         {
             fourBallPointActive = false;
             fourBallPoint.SetActive(false);
+        }
+    }
+
+    private void tickCushionTouch()
+    {
+        for (int i = 0; i < cushionTouch.Length; i++)
+        {
+            if (!cushionTouchActive[i]) continue;
+
+            // Evaluate time
+            cushionTouchTime[i] += Time.deltaTime * 0.25f;
+
+            // Sustained step
+            float s = Mathf.Max(cushionTouchTime[i] - 0.1f, 0.0f);
+            float v = Mathf.Min(cushionTouchTime[i] * cushionTouchTime[i] * 100.0f, 21.0f * s * Mathf.Exp(-15.0f * s));
+
+            // Exponential step
+            float e = Mathf.Exp(-17.0f * Mathf.Pow(Mathf.Max(cushionTouchTime[i] - 1.2f, 0.0f), 3.0f));
+
+            float scale = e * v * 2.0f;
+
+            // Set scale
+            cushionTouch[i].transform.localScale = new Vector3(scale, scale, scale);
+
+            // Set position
+            Vector3 temp = cushionTouch[i].transform.localPosition;
+            temp.y = cushionTouchTime[i] * 0.5f;
+            cushionTouch[i].transform.localPosition = temp;
+
+            // Particle death
+            if (cushionTouchTime[i] > 2.0f)
+            {
+                cushionTouchActive[i] = false;
+                cushionTouch[i].SetActive(false);
+            }
         }
     }
 
@@ -412,6 +471,19 @@ public class GraphicsManager : UdonSharpBehaviour
         fourBallPoint.transform.LookAt(Networking.LocalPlayer.GetPosition());
     }
 
+    public void _SpawnCushionTouch(Vector3 pos, int color)
+    {
+        if (color < 0 || cushionTouch.Length <= color) return;
+        
+        cushionTouch[color].SetActive(true);
+        cushionTouchActive[color] = true;
+        cushionTouchTime[color] = 0.1f;
+
+        cushionTouch[color].transform.localPosition = pos;
+        cushionTouch[color].transform.localScale = Vector3.zero;
+        cushionTouch[color].transform.LookAt(Networking.LocalPlayer.GetPosition());
+    }
+
     public void _FlashTableLight()
     {
         tableCurrentColour *= 1.9f;
@@ -518,7 +590,7 @@ int uniform_cue_colour;
     {
         if (table.is4Ball) updateFourBallCues();
         else if (table.is9Ball) updateNineBallCues();
-        else if (table.is8Ball) updateEightBallCues(idsrc);
+        else if (table.is8Ball || table.isRotation) updateEightBallCues(idsrc);
 
         if (table.isPracticeMode)
         {
@@ -546,6 +618,9 @@ int uniform_cue_colour;
 
     private void updateTable(uint teamId)
     {
+#if TKCH_DEBUG_BREAKING_FOUL
+        table._LogInfo($"TKCH GraphicsManager::updateTable(teamId = {teamId})");
+#endif
         if (table.is4Ball)
         {
             if ((teamId ^ table.teamColorLocal) == 0)
@@ -569,11 +644,17 @@ int uniform_cue_colour;
             {
                 if ((teamId ^ table.teamColorLocal) == 0)
                 {
+#if TKCH_DEBUG_BREAKING_FOUL
+                    table._LogInfo($"  Set table colour to blue");
+#endif
                     // Set table colour to blue
                     tableSrcColour = pColour0;
                 }
                 else
                 {
+#if TKCH_DEBUG_BREAKING_FOUL
+                    table._LogInfo($"  Set table colour to orange");
+#endif
                     // Table colour to orange
                     tableSrcColour = pColour1;
                 }
@@ -587,6 +668,9 @@ int uniform_cue_colour;
     
     public void _UpdateTeamColor(uint teamId)
     {
+#if TKCH_DEBUG_BREAKING_FOUL
+        table._LogInfo($"TKCH GraphicsManager::_UpdateTeamColor(teamId = {teamId})");
+#endif
         updateCues(teamId);
         updateTable(teamId);
     }
@@ -663,12 +747,17 @@ int uniform_cue_colour;
 
     public void _OnGameStarted()
     {
-        scorecard.SetInt("_GameMode", (int)table.gameModeLocal);
+#if TKCH_DEBUG_BREAKING_FOUL
+        table._LogInfo("TKCH GraphicsManager::_OnGameStarted()");
+        table._LogInfo($"  teamId = {table.teamIdLocal}");
+#endif
+
+        scorecard.SetInt("_GameMode", (int)(table.isRotation ? 1 : table.gameModeLocal));
         scorecard.SetInt("_SolidsMode", 0);
         tableMaterial.SetFloat("_TimerPct", 0);
 
         _UpdateTableColorScheme();
-        _UpdateTeamColor(0);
+        _UpdateTeamColor(table.teamIdLocal);
 
         lobbyStatusTextHolder.SetActive(false);
 
@@ -714,6 +803,18 @@ int uniform_cue_colour;
             ballMaterial.SetTexture("_MainTex", table.textureSets[1]);
             pClothColour = table.k_fabricColour_4ball;
         }
+        else if (table.isRotation)
+        {
+            pColourErr = table.k_colour_foul;
+            pColour2 = table.k_colour_default;
+
+            pColour0 = table.k_teamColour_spots;
+            pColour1 = table.k_teamColour_stripes;
+            
+            pClothColour = table.k_fabricColour_9ball;
+
+            ballMaterial.SetTexture("_MainTex", usColorTexture);
+        }
         else // Standard 8 ball derivatives
         {
             pColourErr = table.k_colour_foul;
@@ -744,9 +845,19 @@ int uniform_cue_colour;
         winnerTextHolder.SetActive(false);
         lobbyStatusTextHolder.SetActive(false);
         table.markerObj.SetActive(false);
+        table.markerHeadSpot.SetActive(false);
+        table.markerCenterSpot.SetActive(false);
+        table.markerFootSpot.SetActive(false);
+        table.requestBreakOrange.SetActive(false);
+        table.requestBreakBlue.SetActive(false);
         scorecardHolder.SetActive(false);
         table.marker9ball.SetActive(false);
+        table.markerCalledBall.SetActive(false);
         fourBallPoint.SetActive(false);
+        for (int i = 0; i < cushionTouch.Length; i++)
+        {
+            cushionTouch[i].SetActive(false);
+        }
         table.transform.Find("intl.controls/undo").gameObject.SetActive(false);
         table.transform.Find("intl.controls/redo").gameObject.SetActive(false);
         table.transform.Find("intl.controls/skipturn").gameObject.SetActive(false);
@@ -863,6 +974,35 @@ int uniform_cue_colour;
         {
             table.balls[13].GetComponent<MeshFilter>().sharedMesh = meshOverrideFourBall[0];
             table.balls[0].GetComponent<MeshFilter>().sharedMesh = meshOverrideFourBall[1];
+        }
+    }
+
+    public void _UpdatePointPocketMarker(uint pointPockets, bool callShotLock)
+    {
+        for (int i = 0; i < table.pointPocketMarkers.Length; i++)
+        {
+            bool enable = (pointPockets & (0x1u << i)) != 0;
+            if (enable)
+            {
+                table.pointPocketMarkers[i].GetComponent<MeshRenderer>().material =
+                    (table.teamIdLocal ^ table.teamColorLocal) == 0 ? calledPocketBlue : calledPocketOrange;
+                table.pointPocketMarkerSphere[i].GetComponent<MeshRenderer>().material =
+                    (callShotLock ? calledPocketSphereWhite :
+                        (table.teamIdLocal ^ table.teamColorLocal) == 0 ? calledPocketSphereBlue : calledPocketSphereOrange);
+            }
+            table.pointPocketMarkers[i].SetActive(enable);
+        }
+
+        table.transform.Find("intl.controls/callShotLock/render").GetComponent<MeshRenderer>().material =
+            (callShotLock ? calleShotLockWhite :
+                (table.teamIdLocal ^ table.teamColorLocal) == 0 ? calleShotLockBlue : calleShotLockOrange);
+    }
+
+    public void _DisablePointPocketMarker()
+    {
+        for (int i = 0; i < table.pointPocketMarkers.Length; i++)
+        {
+            table.pointPocketMarkers[i].SetActive(false);
         }
     }
 

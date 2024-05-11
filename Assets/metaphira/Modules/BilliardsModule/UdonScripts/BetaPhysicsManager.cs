@@ -179,6 +179,43 @@ public class BetaPhysicsManager : UdonSharpBehaviour
             }
             else
             {
+                if (!ReferenceEquals(null, Networking.LocalPlayer) && Networking.LocalPlayer.IsUserInVR())
+                {
+                    if (table.isRotation)
+                    {
+                        bool hit = false;
+                        for (int i = 1; i < balls_P.Length; i++)
+                        {
+                            if ((lpos2 - balls_P[i]).sqrMagnitude < k_BALL_RSQR)
+                            {
+                                table._TriggerOtherBallHit(i, false);
+                                hit = true;
+                                break;
+                            }
+                        }
+                        if (!hit)
+                        {
+                            table._TriggerOtherBallHit(-1, false);
+                        }
+                        
+                        hit = false;
+                        for (int i = 0; i < table.pcketLocations.Length; i++)
+                        {
+                            // k_INNER_RADIUS = 0.072
+                            if ((lpos2 - table.pcketLocations[i]).sqrMagnitude < 0.004f) // 0.016f
+                            {
+                                table._TriggerPocketHit(i, false);
+                                hit = true;
+                                break;
+                            }
+                        }
+                        if (!hit)
+                        {
+                            table._TriggerPocketHit(-1, false);
+                        }
+                    }
+                }
+
                 cue_vdir = this.transform.InverseTransformVector(cuetip.transform.forward);//new Vector2( cuetip.transform.forward.z, -cuetip.transform.forward.x ).normalized;
 
                 // Get where the cue will strike the ball
@@ -457,7 +494,7 @@ public class BetaPhysicsManager : UdonSharpBehaviour
                         // table.LogInfo(balls[srcId] + " phased into pocket " + pockets[pocketCollider]);
                         pocketed[srcId] = true;
                         hitCushionMaybe = false;
-                        table._TriggerPocketBall(srcId);
+                        table._TriggerPocketBall(srcId, -1);
                         balls_V[srcId] = Vector3.zero;
                         balls_W[srcId] = Vector3.zero;
                     }
@@ -811,7 +848,7 @@ public class BetaPhysicsManager : UdonSharpBehaviour
 
     private bool isCueBallTouching()
     {
-        if (table.is8Ball) // 8 ball
+        if (table.is8Ball || table.isRotation) // 8 ball
         {
             // Check all
             for (int i = 1; i < 16; i++)
@@ -898,6 +935,7 @@ public class BetaPhysicsManager : UdonSharpBehaviour
         Vector3 source_v = balls_V[id];
         if (Vector3.Dot(source_v, N) > 0.0f)
         {
+            // table._TriggerCushion(id, balls_P[id]);
             // return;
         }
 
@@ -942,6 +980,8 @@ public class BetaPhysicsManager : UdonSharpBehaviour
         // Unrotate result
         balls_V[id] += rb * V1;
         balls_W[id] += rb * W1;
+        
+        table._TriggerCushion(id, balls_P[id]);
     }
 
 
@@ -1092,7 +1132,7 @@ public class BetaPhysicsManager : UdonSharpBehaviour
         {
             balls_V[id] = Vector3.zero;
             balls_W[id] = Vector3.zero;
-            table._TriggerPocketBall(id);
+            table._TriggerPocketBall(id, (0 < balls_P[id].z ? (0 < balls_P[id].x ? 0 : 2) : (0 < balls_P[id].x ? 1 : 3)));
             return;
         }
 
@@ -1100,7 +1140,7 @@ public class BetaPhysicsManager : UdonSharpBehaviour
         {
             balls_V[id] = Vector3.zero;
             balls_W[id] = Vector3.zero;
-            table._TriggerPocketBall(id);
+            table._TriggerPocketBall(id, 0 <= balls_P[id].z ? 4 : 5);
             return;
         }
 
@@ -1108,7 +1148,7 @@ public class BetaPhysicsManager : UdonSharpBehaviour
         {
             balls_V[id] = Vector3.zero;
             balls_W[id] = Vector3.zero;
-            table._TriggerPocketBall(id);
+            table._TriggerPocketBall(id, 0 <= balls_P[id].z ? 4 : 5);
             return;
         }
 
@@ -1116,7 +1156,7 @@ public class BetaPhysicsManager : UdonSharpBehaviour
         {
             balls_V[id] = Vector3.zero;
             balls_W[id] = Vector3.zero;
-            table._TriggerPocketBall(id);
+            table._TriggerPocketBall(id, (0 < balls_P[id].z ? (0 < balls_P[id].x ? 0 : 2) : (0 < balls_P[id].x ? 1 : 3)));
             return;
         }
     }
