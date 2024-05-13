@@ -222,6 +222,7 @@ public class BilliardsModule : UdonSharpBehaviour
     [NonSerialized] public int[] fbScoresLocal = new int[2];
     [NonSerialized] public int[] totalPointsLocal = new int[2];
     [NonSerialized] public int[] chainedPointsLocal = new int[2];
+    [NonSerialized] public int[] chainedFoulsLocal = new int[2];
     [NonSerialized] public bool noCushionLocal;
     [NonSerialized] public uint winningTeamLocal;
     [NonSerialized] public uint previewWinningTeamLocal;
@@ -941,6 +942,7 @@ public class BilliardsModule : UdonSharpBehaviour
         onRemoteFourBallCueBallChanged(networkingManager.fourBallCueBallSynced);
         onRemoteBallsPocketedChanged(networkingManager.ballsPocketedSynced, networkingManager.targetPocketedSynced, networkingManager.otherPocketedSynced);
         onRemoteFourBallScoresUpdated(networkingManager.fourBallScoresSynced);
+        Array.Copy(networkingManager.chainedFoulsSynced, chainedFoulsLocal, chainedFoulsLocal.Length);
         onRemoteRepositionStateChanged(networkingManager.repositionStateSynced);
         onRemoteIsTableOpenChanged(networkingManager.isTableOpenSynced, networkingManager.teamColorSynced);
         onRemoteTurnStateChanged(networkingManager.turnStateSynced);
@@ -1441,7 +1443,7 @@ public class BilliardsModule : UdonSharpBehaviour
         if (repositionStateLocal == 1 || repositionStateLocal == 2)
         {
             isReposition = true;
-            if (repositionStateLocal == 1 || isRotation)
+            if (repositionStateLocal == 1 || (isRotation && chainedFoulsLocal[teamIdLocal ^ 0x1u] < 3))
             {
 #if TKCH_DEBUG_BREAKING_FOUL
                 _LogInfo("  repoMaxX = -k_SPOT_POSITION_X");
@@ -1973,7 +1975,16 @@ public class BilliardsModule : UdonSharpBehaviour
                     chainedPointsLocal[teamIdLocal] = 0;
                 }
  
-                UpdateScoreSyncRowsByFlags(!foulCondition, foulCondition);
+                chainedFoulsLocal[teamIdLocal] = foulCondition ? chainedFoulsLocal[teamIdLocal] + 1 : 0;
+                if (3 <= chainedFoulsLocal[teamIdLocal])
+                {
+                    if (isScratch) ballsP[0] = Vector3.zero;
+                }
+                if (3 <= chainedFoulsLocal[teamIdLocal ^ 0x1u])
+                {
+                    chainedFoulsLocal[teamIdLocal ^ 0x1u] = 0;
+                }
+                UpdateScoreSyncRowsByFlags(/* !foulCondition, foulCondition */);
                 
                 if (foulCondition && !isScratch && (isNoTouch || isNoCushon || isWrongHit))
                 {
@@ -2008,7 +2019,7 @@ public class BilliardsModule : UdonSharpBehaviour
             semiAutoCalledPocket = false;
 
             networkingManager._OnSimulationEnded(ballsP, ballsPocketedLocal, targetPocketedLocal, otherPocketedLocal, 
-                fbScoresLocal, totalPointsLocal, chainedPointsLocal, 
+                fbScoresLocal, totalPointsLocal, chainedPointsLocal, chainedFoulsLocal,
                 noCushionLocal, inningCountLocal, winRackCountLocal);
 
             if (isRotation && goalPointsLocal <= networkingManager.totalPointsSynced[teamIdLocal])
@@ -2352,18 +2363,15 @@ public class BilliardsModule : UdonSharpBehaviour
                 Array.Copy(ballsP, networkingManager.ballsPSynced, ballsP.Length);
                 Array.Copy(totalPointsLocal, networkingManager.totalPointsSynced, totalPointsLocal.Length);
                 Array.Copy(chainedPointsLocal, networkingManager.chainedPointsSynced, chainedPointsLocal.Length);
+                Array.Copy(chainedFoulsLocal, networkingManager.chainedFoulsSynced, chainedFoulsLocal.Length);
                 networkingManager.ballsPocketedSynced = ballsPocketedLocal;
                 networkingManager.targetPocketedSynced = targetPocketedLocal;
                 networkingManager.otherPocketedSynced = otherPocketedLocal;
                 networkingManager.noCushionSynced = noCushionLocal;
-                networkingManager._OnTurnFoul(teamIdLocal ^ 0x1u, false, true, reBreakAllowed);
-                return;
             }
-            else
-            {
-                networkingManager._OnTurnFoul(teamIdLocal ^ 0x1u, reposition, true, reBreakAllowed);
-                return;
-            }
+            
+            networkingManager._OnTurnFoul(teamIdLocal ^ 0x1u, reposition, true, reBreakAllowed);
+            return;
         }
 
         networkingManager._OnTurnFoul(teamIdLocal ^ 0x1u, reposition, false, false);
@@ -2434,8 +2442,13 @@ public class BilliardsModule : UdonSharpBehaviour
                     reposition = false;
                     noCushionLocal = true;
                 }
-                
-                UpdateScoreSyncRowsByFlags(false, true);
+
+                chainedFoulsLocal[teamIdLocal]++;
+                if (3 <= chainedFoulsLocal[teamIdLocal ^ 0x1u])
+                {
+                    chainedFoulsLocal[teamIdLocal ^ 0x1u] = 0;
+                }
+                UpdateScoreSyncRowsByFlags(/* false, true */);
 
                 // everyone on the current team propagates the change
                 onLocalTurnFoul(true, reposition, !afterBreak);
@@ -2689,7 +2702,18 @@ public class BilliardsModule : UdonSharpBehaviour
         
         if ((nextBallRepositionStateLocal & 0x2u) > 0 /* || repositionStateLocal == 0 */)
         {
-            markerHeadSpot.SetActive(true);
+            if (chainedFoulsLocal[teamIdLocal ^ 0x1u] < 3)
+            {
+                markerHeadSpot.SetActive(true);
+            }
+            else
+            {
+                markerHeadSpot.SetActive(false);
+                isReposition = true;
+                Vector3 k_pR = (Vector3)currentPhysicsManager.GetProgramVariable("k_pR");
+                repoMaxX = k_pR.x;
+                setFoulPickupEnabled(true);
+            }
         }
         else
         {
@@ -3226,7 +3250,7 @@ public class BilliardsModule : UdonSharpBehaviour
     }
     #endregion
 
-    public void UpdateScoreSyncRowsByFlags(bool foulCountClear, bool foulCountIncrement)
+    public void UpdateScoreSyncRowsByFlags(/* bool foulCountClear, bool foulCountIncrement */)
     {
 #if TKCH_DEBUG_WINRACKCOUNT || TKCH_DEBUG_SCORE
         _LogInfo("TKCH BilliardsModule::UpdateScoreSyncRowsByFlags()");
@@ -3244,7 +3268,7 @@ public class BilliardsModule : UdonSharpBehaviour
 
                 encodeScoreSyncValues = scoreScreen.EncodeScoreParams(
                     totalPointsLocal[teamId],
-                    (foulCountClear ? 0 : scoreScreen.GetTeamScratchCount(teamId) + (foulCountIncrement ? 1 : 0)),
+                    chainedFoulsLocal[teamIdLocal], // (foulCountClear ? 0 : scoreScreen.GetTeamScratchCount(teamId) + (foulCountIncrement ? 1 : 0)),
                     winRackCountLocal[teamId],
                     inningCountLocal + 1, // turn count
                     maxChainedPoint, // high run
@@ -3255,7 +3279,7 @@ public class BilliardsModule : UdonSharpBehaviour
             {
                 encodeScoreSyncValues = scoreScreen.EncodeScoreParams(
                     scoreScreen.GetTeamPoint(teamId),
-                    scoreScreen.GetTeamScratchCount(teamId),
+                    chainedFoulsLocal[teamId], // scoreScreen.GetTeamScratchCount(teamId),
                     scoreScreen.GetTeamPocketBallCount(teamId),
                     scoreScreen.GetTeamShotCount(teamId),
                     scoreScreen.GetTeamSafeNoPocketShotCount(teamId),

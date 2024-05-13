@@ -95,6 +95,7 @@ public class NetworkingManager : UdonSharpBehaviour
 
     [UdonSynced] [NonSerialized] public int[] totalPointsSynced = new int[2];
     [UdonSynced] [NonSerialized] public int[] chainedPointsSynced = new int[2];
+    [UdonSynced] [NonSerialized] public int[] chainedFoulsSynced = new int[2];
 
     // the currently active four ball cue ball (0 is white, 1 is yellow)
     [UdonSynced] [NonSerialized] public byte fourBallCueBallSynced;
@@ -286,6 +287,7 @@ public class NetworkingManager : UdonSharpBehaviour
         Array.Clear(fourBallScoresSynced, 0, 2);
         // Array.Clear(totalPointsSynced, 0, 2);
         // Array.Clear(chainedPointsSynced, 0, 2);
+        // Array.Clear(chainedFoulsSynced, 0, 2);
         
         targetPocketedSynced = 0;
         otherPocketedSynced = 0;
@@ -308,13 +310,14 @@ public class NetworkingManager : UdonSharpBehaviour
     }
 
     public void _OnSimulationEnded(Vector3[] ballsP, uint ballsPocketed, uint targetPocketed, uint otherPocketed, 
-        int[] fbScores, int[] totalPoints, int[] chainedPoints,
+        int[] fbScores, int[] totalPoints, int[] chainedPoints, int[] chainedFouls,
         bool noCushion, int inningCount, int[] winRackCount)
     {
         Array.Copy(ballsP, ballsPSynced, MAX_BALLS);
         Array.Copy(fbScores, fourBallScoresSynced, 2);
         Array.Copy(totalPoints, totalPointsSynced, 2);
         Array.Copy(chainedPoints, chainedPointsSynced, 2);
+        Array.Copy(chainedFouls, chainedFoulsSynced, 2);
         ballsPocketedSynced = ballsPocketed;
         targetPocketedSynced = targetPocketed;
         otherPocketedSynced = otherPocketed;
@@ -459,6 +462,7 @@ public class NetworkingManager : UdonSharpBehaviour
         Array.Clear(fourBallScoresSynced, 0, 2);
         Array.Clear(totalPointsSynced, 0, 2);
         Array.Clear(chainedPointsSynced, 0, 2);
+        Array.Clear(chainedFoulsSynced, 0, 2);
         Array.Clear(winRackCountSynced, 0, 2);
 
         if (table.isRotation)
