@@ -2713,6 +2713,7 @@ public class BilliardsModule : UdonSharpBehaviour
                 Vector3 k_pR = (Vector3)currentPhysicsManager.GetProgramVariable("k_pR");
                 repoMaxX = k_pR.x;
                 setFoulPickupEnabled(true);
+                repositionStateLocal = 2;
             }
         }
         else
