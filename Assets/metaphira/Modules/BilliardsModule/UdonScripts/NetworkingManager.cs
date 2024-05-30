@@ -1,4 +1,6 @@
-﻿using System;
+﻿//#define TKCH_DEBUG_CALLSHOT_TEAM
+
+using System;
 using UdonSharp;
 using UnityEngine;
 using VRC.SDKBase;
@@ -33,6 +35,12 @@ public class NetworkingManager : UdonSharpBehaviour
     // bitmask of pocketed balls
     [UdonSynced] [NonSerialized] public uint ballsPocketedSynced;
 
+    [UdonSynced] [NonSerialized] public uint targetPocketedSynced;
+    [UdonSynced] [NonSerialized] public uint otherPocketedSynced;
+    [UdonSynced] [NonSerialized] public uint denyBallsSynced;
+    [UdonSynced] [NonSerialized] public uint pointPocketsSynced;
+    [UdonSynced] [NonSerialized] public uint calledBallsSynced;
+
     // the current team which is playing
     [UdonSynced] [NonSerialized] public byte teamIdSynced;
 
@@ -41,6 +49,9 @@ public class NetworkingManager : UdonSharpBehaviour
 
     // the current reposition state (0 is reposition not allowed, 1 is reposition in kitchen, 2 is reposition anywhere)
     [UdonSynced] [NonSerialized] public byte repositionStateSynced;
+
+    // move next ball on after foul (0 is reposition not allowed, 0x1u (01b) is reposition on foot or center, 0x2u (10b) is cue ball reposition in kitchen or no move)
+    [UdonSynced] [NonSerialized] public byte nextBallRepositionStateSynced;
 
     // whether or not the table is open or not (i.e. no suit decided yet)
     [UdonSynced] [NonSerialized] public bool isTableOpenSynced;
@@ -63,6 +74,11 @@ public class NetworkingManager : UdonSharpBehaviour
     // the current gamemode (0 is 8ball, 1 is 9ball, 2 is jp4b, 3 is kr4b)
     [UdonSynced] [NonSerialized] public byte gameModeSynced;
 
+    [UdonSynced] [NonSerialized] public int goalPointsSynced = 20;
+    [UdonSynced] [NonSerialized] public byte rackConditionSynced = 0;
+    [UdonSynced] [NonSerialized] public bool semiAutoCallBallSynced;
+    [UdonSynced] [NonSerialized] public bool semiAutoCallPocketSynced;
+
     // the timer for the current game in seconds
     [UdonSynced] [NonSerialized] public uint timerSynced;
 
@@ -75,8 +91,16 @@ public class NetworkingManager : UdonSharpBehaviour
     // whether or not the cue can be locked
     [UdonSynced] [NonSerialized] public bool noLockingSynced;
 
+    [UdonSynced] [NonSerialized] public bool callShotLockSynced;
+
     // scores if game state is 2 or 3 (4ball)
     [UdonSynced] [NonSerialized] public int[] fourBallScoresSynced = new int[2];
+
+    [UdonSynced] [NonSerialized] public int[] totalPointsSynced = new int[2];
+    [UdonSynced] [NonSerialized] public int[] shotCountsSynced = new int[2];
+    [UdonSynced] [NonSerialized] public int[] shotSuccessCountsSynced = new int[2];
+    [UdonSynced] [NonSerialized] public int[] chainedPointsSynced = new int[2];
+    [UdonSynced] [NonSerialized] public int[] chainedFoulsSynced = new int[2];
 
     // the currently active four ball cue ball (0 is white, 1 is yellow)
     [UdonSynced] [NonSerialized] public byte fourBallCueBallSynced;
@@ -96,6 +120,13 @@ public class NetworkingManager : UdonSharpBehaviour
     // the current table skin
     [UdonSynced] [NonSerialized] public byte tableSkinSynced;
 
+    // [UdonSynced] [NonSerialized] public bool noCushionSynced;
+    [UdonSynced] [NonSerialized] public byte specialPenaltySynced;
+    [UdonSynced] [NonSerialized] public int inningCountSynced;
+    [UdonSynced] [NonSerialized] public int[] winRackCountSynced = new int[2];
+    [UdonSynced] [NonSerialized] public byte breakBallIdSynced;
+    [UdonSynced] [NonSerialized] public bool isOpeningBreakSynced = true;
+
     [SerializeField] private PlayerSlot[] playerSlots;
     
     private BilliardsModule table;
@@ -107,6 +138,8 @@ public class NetworkingManager : UdonSharpBehaviour
 
     // private bool hasDeferredUpdate;
     // private bool hasLocalUpdate;
+
+    [UdonSynced] [NonSerialized] public uint[] scoreSyncRows = new uint[4];
 
     public void _Init(BilliardsModule table_)
     {
@@ -238,6 +271,46 @@ public class NetworkingManager : UdonSharpBehaviour
         bufferMessages(false);
     }
 
+    public void _OnGameNextBreak(uint defaultBallsPocketed, Vector3[] ballPositions, 
+        uint breakTeamId, int repositionState, bool openingBreak, bool forceTurnStateChange)
+    {
+        stateIdSynced++;
+
+        // gameStateSynced = (byte)((gameStateSynced != 2) ? 2 : (reBreakRequested ? 5 : 4));
+        gameStateSynced = (byte)((gameStateSynced == 2) ? 4 : 2);
+        isOpeningBreakSynced = openingBreak;
+        //winningTeamSynced = (byte)winnerId;
+
+        //gameStateSynced = 2;
+        ballsPocketedSynced = defaultBallsPocketed;
+        repositionStateSynced = (byte)repositionState;
+        nextBallRepositionStateSynced = 0;
+        turnStateSynced = (byte)(forceTurnStateChange ? 3 : 0); // 2
+        // isTableOpenSynced = true;
+        teamIdSynced = (byte)breakTeamId;
+        fourBallCueBallSynced = 0;
+        cueBallVSynced = Vector3.zero;
+        cueBallWSynced = Vector3.zero;
+        previewWinningTeamSynced = 2;
+        timerStartSynced = Networking.GetServerTimeInMilliseconds();
+        Array.Copy(ballPositions, ballsPSynced, MAX_BALLS);
+        Array.Clear(fourBallScoresSynced, 0, 2);
+        // Array.Clear(totalPointsSynced, 0, 2);
+        // Array.Clear(chainedPointsSynced, 0, 2);
+        // Array.Clear(chainedFoulsSynced, 0, 2);
+        
+        targetPocketedSynced = 0;
+        otherPocketedSynced = 0;
+        isTableOpenSynced = false;
+        // teamColorSynced = (byte)(teamIdSynced ^ 0x1u);
+
+        calledBallsSynced = 0;
+        pointPocketsSynced = 0;
+        callShotLockSynced = false;
+        
+        bufferMessages(false);
+    }
+
     public void _OnGameReset()
     {
         gameStateSynced = 3;
@@ -246,16 +319,30 @@ public class NetworkingManager : UdonSharpBehaviour
         bufferMessages(true);
     }
 
-    public void _OnSimulationEnded(Vector3[] ballsP, uint ballsPocketed, int[] fbScores)
+    public void _OnSimulationEnded(Vector3[] ballsP, uint ballsPocketed, uint targetPocketed, uint otherPocketed, uint denyBalls, 
+        int[] fbScores, int[] totalPoints, int[] shotCounts, int[] successShotCounts, int[] chainedPoints, int[] chainedFouls,
+        uint specialPenalty, int inningCount, int[] winRackCount)
     {
         Array.Copy(ballsP, ballsPSynced, MAX_BALLS);
         Array.Copy(fbScores, fourBallScoresSynced, 2);
+        Array.Copy(totalPoints, totalPointsSynced, 2);
+        Array.Copy(shotCounts, shotCountsSynced, 2);
+        Array.Copy(successShotCounts, shotSuccessCountsSynced, 2);
+        Array.Copy(chainedPoints, chainedPointsSynced, 2);
+        Array.Copy(chainedFouls, chainedFoulsSynced, 2);
         ballsPocketedSynced = ballsPocketed;
+        targetPocketedSynced = targetPocketed;
+        otherPocketedSynced = otherPocketed;
+        denyBallsSynced = denyBalls;
+        // noCushionSynced = noCushion;
+        specialPenaltySynced = (byte)specialPenalty;
+        inningCountSynced = inningCount;
+        Array.Copy(winRackCount, winRackCountSynced, 2);
         
         bufferMessages(false);
     }
 
-    public void _OnTurnPass(uint teamId)
+    public void _OnTurnPass(uint teamId, bool reBreakAllowed)
     {
         stateIdSynced++;
 
@@ -263,19 +350,29 @@ public class NetworkingManager : UdonSharpBehaviour
         turnStateSynced = 0;
         timerStartSynced = Networking.GetServerTimeInMilliseconds();
         swapFourBallCueBalls();
+        calledBallsSynced = 0;
+        pointPocketsSynced = 0;
+        callShotLockSynced = false;
+        nextBallRepositionStateSynced = (byte)(reBreakAllowed ? 0x4u : 0);
+        isOpeningBreakSynced = false;
 
         bufferMessages(false);
     }
 
-    public void _OnTurnFoul(uint teamId)
+    public void _OnTurnFoul(uint teamId, bool reposition, bool nextBallReposition, bool reBreakAllowed)
     {
         stateIdSynced++;
 
         teamIdSynced = (byte)teamId;
         turnStateSynced = 2;
         timerStartSynced = Networking.GetServerTimeInMilliseconds();
-        repositionStateSynced = 2;
+        repositionStateSynced = (byte)(reposition ? 2 : 0);
         swapFourBallCueBalls();
+        calledBallsSynced = 0;
+        pointPocketsSynced = 0;
+        callShotLockSynced = false;
+        nextBallRepositionStateSynced = (byte)((nextBallReposition ? 0x1u : 0)|(reposition ? 0 : 0x2u)|(reBreakAllowed ? 0x4u : 0));
+        isOpeningBreakSynced = false;
 
         bufferMessages(false);
     }
@@ -286,6 +383,10 @@ public class NetworkingManager : UdonSharpBehaviour
 
         turnStateSynced = 0;
         timerStartSynced = Networking.GetServerTimeInMilliseconds();
+        calledBallsSynced = 0;
+        pointPocketsSynced = 0;
+        callShotLockSynced = false;
+        isOpeningBreakSynced = false;
 
         bufferMessages(false);
     }
@@ -304,6 +405,7 @@ public class NetworkingManager : UdonSharpBehaviour
 
         turnStateSynced = 1;
         repositionStateSynced = 0;
+        nextBallRepositionStateSynced = 0;
         cueBallVSynced = cueBallV;
         cueBallWSynced = cueBallW;
         simulationOwnerSynced = Networking.LocalPlayer.displayName;
@@ -364,6 +466,7 @@ public class NetworkingManager : UdonSharpBehaviour
         gameStateSynced = 2;
         ballsPocketedSynced = defaultBallsPocketed;
         repositionStateSynced = 1;
+        nextBallRepositionStateSynced = 0;
         turnStateSynced = 0;
         isTableOpenSynced = true;
         teamIdSynced = 0;
@@ -374,6 +477,25 @@ public class NetworkingManager : UdonSharpBehaviour
         timerStartSynced = Networking.GetServerTimeInMilliseconds();
         Array.Copy(ballPositions, ballsPSynced, MAX_BALLS);
         Array.Clear(fourBallScoresSynced, 0, 2);
+        Array.Clear(totalPointsSynced, 0, totalPointsSynced.Length);
+        Array.Clear(shotCountsSynced, 0, shotCountsSynced.Length);
+        Array.Clear(shotSuccessCountsSynced, 0, shotSuccessCountsSynced.Length);
+        Array.Clear(chainedPointsSynced, 0, chainedPointsSynced.Length);
+        Array.Clear(chainedFoulsSynced, 0, chainedFoulsSynced.Length);
+        Array.Clear(winRackCountSynced, 0, winRackCountSynced.Length);
+
+        if (table.isStraight)
+        {
+            targetPocketedSynced = 0;
+            otherPocketedSynced = 0;
+            denyBallsSynced = 0;
+            isTableOpenSynced = false;
+            teamColorSynced = (byte)(teamIdSynced ^ 0x1u);
+            pointPocketsSynced = 0;
+            calledBallsSynced = 0;
+            breakBallIdSynced = 0;
+            isOpeningBreakSynced = true;
+        }
 
         bufferMessages(false);
     }
@@ -398,6 +520,49 @@ public class NetworkingManager : UdonSharpBehaviour
     public void _OnKickLobby(int playerId)
     {
         playerSlots[playerId]._Reset();
+    }
+
+    public void _OnCalledBallChanged(bool enabled, uint id)
+    {
+        uint ball_bit = 0x1u << (int)id;
+        uint calledBalls = calledBallsSynced;
+        if (enabled)
+        {
+            calledBalls = ball_bit;
+        }
+        else
+        {
+            calledBalls = 0;
+        }
+
+        calledBallsSynced = calledBalls;
+        
+        bufferMessages(false);
+    }
+
+    public void _OnPocketChanged(bool pocketEnabled, uint pocket)
+    {
+        uint pocketBit = 0x1u << (int)pocket;
+        uint pointPockets = pointPocketsSynced;
+        if (pocketEnabled)
+        {
+            pointPockets = pocketBit;
+        }
+        else
+        {
+            pointPockets = 0;
+        }
+
+        pointPocketsSynced = pointPockets;
+        
+        bufferMessages(false);
+    }
+
+    public void _OnCallShotLockChanged(bool callShotLockEnabled)
+    {
+        callShotLockSynced = callShotLockEnabled;
+
+        bufferMessages(false);
     }
 
     public void _OnTeamsChanged(bool teamsEnabled)
@@ -428,6 +593,35 @@ public class NetworkingManager : UdonSharpBehaviour
         bufferMessages(false);
     }
 
+    public void _OnRackCondisionChanged(uint rackCondition)
+    {
+        rackConditionSynced = (byte)rackCondition;
+
+        bufferMessages(false);
+    }
+
+    public void _OnSemiAutoCallChanged(bool semiAutoCallEnabled)
+    {
+        semiAutoCallBallSynced = semiAutoCallEnabled;
+        semiAutoCallPocketSynced = semiAutoCallEnabled;
+
+        bufferMessages(false);
+    }
+
+    // public void _OnSemiAutoCallBallChanged(bool semiAutoCallBallEnabled)
+    // {
+    //     semiAutoCallBallSynced = semiAutoCallBallEnabled;
+    //
+    //     bufferMessages(false);
+    // }
+    //
+    // public void _OnSemiAutoCallPocketChanged(bool semiAutoCallPocketEnabled)
+    // {
+    //     semiAutoCallPocketSynced = semiAutoCallPocketEnabled;
+    //
+    //     bufferMessages(false);
+    // }
+
     public void _OnTimerChanged(uint newTimer)
     {
         timerSynced = newTimer;
@@ -442,21 +636,36 @@ public class NetworkingManager : UdonSharpBehaviour
         bufferMessages(false);
     }
 
+    public void _OnGoalPointsChanged(int goalPoints)
+    {
+        goalPointsSynced = goalPoints;
+
+        bufferMessages(false);
+    }
+
     public void _ForceLoadFromState
     (
         int stateIdLocal,
         Vector3[] newBallsP, uint ballsPocketed, int[] newScores, uint gameMode, uint teamId, uint repositionState, bool isTableOpen, uint teamColor, uint fourBallCueBall,
-        byte turnStateLocal, Vector3 cueBallV, Vector3 cueBallW, byte previewWinningTeam
+        byte turnStateLocal, Vector3 cueBallV, Vector3 cueBallW, byte previewWinningTeam, uint nextBallRepositionState,
+        uint targetPocketed, uint otherPocketed, uint denyBalls, byte pointPockets, uint calledBalls, int[] totalPoints, int[] shotCounts, int[] shotSuccessCounts
     )
     {
         stateIdSynced = stateIdLocal;
 
         Array.Copy(newBallsP, ballsPSynced, MAX_BALLS);
         ballsPocketedSynced = ballsPocketed;
+        targetPocketedSynced = targetPocketed;
+        otherPocketedSynced = otherPocketed;
+        denyBallsSynced = denyBalls;
         Array.Copy(newScores, fourBallScoresSynced, 2);
+        Array.Copy(totalPoints, totalPointsSynced, totalPointsSynced.Length);
+        Array.Copy(shotCounts, shotCountsSynced, shotCountsSynced.Length);
+        Array.Copy(shotSuccessCounts, shotSuccessCountsSynced, shotSuccessCountsSynced.Length);
         gameModeSynced = (byte)gameMode;
         teamIdSynced = (byte)teamId;
         repositionStateSynced = (byte) repositionState;
+        nextBallRepositionStateSynced = (byte)nextBallRepositionState;
         isTableOpenSynced = isTableOpen;
         teamColorSynced = (byte)teamColor;
         turnStateSynced = turnStateLocal;
@@ -466,6 +675,11 @@ public class NetworkingManager : UdonSharpBehaviour
         timerStartSynced = Networking.GetServerTimeInMilliseconds();
         simulationOwnerSynced = Networking.LocalPlayer.displayName;
         previewWinningTeamSynced = previewWinningTeam;
+        pointPocketsSynced = pointPockets;
+        calledBallsSynced = calledBalls;
+
+        table.UpdateScoreSyncRowsByParams(teamIdSynced, totalPointsSynced, chainedFoulsSynced, 
+            winRackCountSynced, shotCountsSynced, shotSuccessCountsSynced, chainedPointsSynced);
 
         bufferMessages(true);
         // OnDeserialization(); // jank! force deserialization so the practice manager knows to ignore it
@@ -513,6 +727,9 @@ public class NetworkingManager : UdonSharpBehaviour
 
         hasBufferedMessages = false;
         packetIdSynced++;
+#if TKCH_DEBUG_CALLSHOT_TEAM
+        table._LogInfo($"  packetIdSynced = {packetIdSynced}");
+#endif
 
         Networking.SetOwner(Networking.LocalPlayer, this.gameObject);
         this.RequestSerialization();
@@ -708,7 +925,7 @@ public class NetworkingManager : UdonSharpBehaviour
         bufferMessages(true);
     }
 
-    public string _EncodeGameState()
+    public string _EncodeGameState() // todo:straight
     {
         byte[] gameState = new byte[0x7a];
         for (int i = 0; i < 16; i++)

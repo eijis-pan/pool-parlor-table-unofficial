@@ -1,4 +1,6 @@
-﻿using System;
+﻿//#define TKCH_DEBUG_TOGGLE
+
+using System;
 using UdonSharp;
 using UnityEngine;
 using UnityEngine.UI;
@@ -21,11 +23,22 @@ public class MenuManager : UdonSharpBehaviour
     [SerializeField] public UIButton button4Ball;
     [SerializeField] public UIButton button4BallJP;
     [SerializeField] public UIButton button4BallKR;
+    [SerializeField] public UIButton button10Win;
+    [SerializeField] public UIButton button20Win;
+    [SerializeField] public UIButton button30Win;
+    [SerializeField] public UIButton button50Win;
+    [SerializeField] public UIButton button70Win;
+    [SerializeField] public UIButton button100Win;
     [SerializeField] public UIButton buttonTimerLeft;
     [SerializeField] public UIButton buttonTimerRight;
     [SerializeField] public UIButton buttonTeamsToggle;
     [SerializeField] public UIButton buttonGuidelineToggle;
     [SerializeField] public UIButton buttonLockingToggle;
+    [SerializeField] public UIButton buttonRackSheet;
+    [SerializeField] public UIButton buttonWoodFrame;
+    [SerializeField] public UIButton buttonSemiAutoCallToggle;
+    // [SerializeField] public UIButton buttonSemiAutoCallBallToggle;
+    // [SerializeField] public UIButton buttonSemiAutoCallPocketToggle;
 
     [SerializeField] public UIButton buttonLeave;
     [SerializeField] public UIButton buttonPlay;
@@ -75,12 +88,19 @@ public class MenuManager : UdonSharpBehaviour
     public void _RefreshGameMode()
     {
         uint menuGameMode = table.gameModeLocal;
+        int goalPoints = table.goalPointsLocal;
 
         button8Ball._ResetPushButton();
         button9Ball._ResetPushButton();
         button4Ball._ResetPushButton();
         button4BallJP._ResetPushButton();
         button4BallKR._ResetPushButton();
+        button10Win._ResetPushButton();
+        button20Win._ResetPushButton();
+        button30Win._ResetPushButton();
+        button50Win._ResetPushButton();
+        button70Win._ResetPushButton();
+        button100Win._ResetPushButton();
 
         switch (menuGameMode)
         {
@@ -105,6 +125,32 @@ public class MenuManager : UdonSharpBehaviour
                 button4BallKR._SetButtonPushed();
                 button4BallJP.gameObject.SetActive(true);
                 button4BallKR.gameObject.SetActive(true);
+                break;
+            case 4:
+                switch (goalPoints)
+                {
+                    case 10:
+                        button10Win._SetButtonPushed();
+                        break;
+                    case 20:
+                        button20Win._SetButtonPushed();
+                        break;
+                    case 30:
+                        button30Win._SetButtonPushed();
+                        break;
+                    case 50:
+                        button50Win._SetButtonPushed();
+                        break;
+                    case 70:
+                        button70Win._SetButtonPushed();
+                        break;
+                    case 100:
+                        button100Win._SetButtonPushed();
+                        break;
+                }
+                button4BallJP.gameObject.SetActive(false);
+                button4BallKR.gameObject.SetActive(false);
+                table.scoreScreen.UpdateGameNameWithNumber("Straight Pool 14-1", goalPoints);
                 break;
         }
     }
@@ -164,6 +210,25 @@ public class MenuManager : UdonSharpBehaviour
             lobbyNames[i].text = table.graphicsManager._FormatName(table.playerNamesLocal[i]);
         }
 
+        for (int i = 0; i < 2; i++)
+        {
+            string teamName = i == 0 ? "[Orange]" : "[Blue]";
+            string name = table.playerNamesLocal[i];
+            if (name != "")
+            {
+                teamName = name;
+            }
+            if (table.teamsLocal)
+            {
+                name = table.playerNamesLocal[i + 2];
+                if (name != "")
+                {
+                    teamName += "\n" + name;
+                }
+            }
+            table.scoreScreen.UpdateTeamName(i, teamName);
+        }
+
         refreshJoinButtons();
     }
 
@@ -185,6 +250,19 @@ public class MenuManager : UdonSharpBehaviour
         buttonTeamsToggle._SetButtonToggle(table.teamsLocal);
         buttonGuidelineToggle._SetButtonToggle(!table.noGuidelineLocal);
         buttonLockingToggle._SetButtonToggle(!table.noLockingLocal);
+        buttonRackSheet._ResetPushButton();
+        buttonWoodFrame._ResetPushButton();
+        buttonSemiAutoCallToggle._SetButtonToggle(table.semiAutoCallBallLocal);
+        // buttonSemiAutoCallBallToggle._SetButtonToggle(table.semiAutoCallBallLocal);
+        // buttonSemiAutoCallPocketToggle._SetButtonToggle(table.semiAutoCallPocketLocal);
+        if (table.rackConditionLocal == 0)
+        {
+            buttonRackSheet._SetButtonPushed();
+        }
+        else
+        {
+            buttonWoodFrame._SetButtonPushed();
+        }
 
         _RefreshPlayerList();
     }
@@ -197,11 +275,22 @@ public class MenuManager : UdonSharpBehaviour
         button4Ball.disableInteractions = isNormalPlayer;
         button4BallJP.disableInteractions = isNormalPlayer;
         button4BallKR.disableInteractions = isNormalPlayer;
+        button10Win.disableInteractions = isNormalPlayer;
+        button20Win.disableInteractions = isNormalPlayer;
+        button30Win.disableInteractions = isNormalPlayer;
+        button50Win.disableInteractions = isNormalPlayer;
+        button70Win.disableInteractions = isNormalPlayer;
+        button100Win.disableInteractions = isNormalPlayer;
         buttonTeamsToggle.disableInteractions = isNormalPlayer;
         buttonGuidelineToggle.disableInteractions = isNormalPlayer;
         buttonLockingToggle.disableInteractions = isNormalPlayer;
         buttonTimerLeft.disableInteractions = isNormalPlayer;
         buttonTimerRight.disableInteractions = isNormalPlayer;
+        buttonRackSheet.disableInteractions = isNormalPlayer;
+        buttonWoodFrame.disableInteractions = isNormalPlayer;
+        buttonSemiAutoCallToggle.disableInteractions = isNormalPlayer;
+        // buttonSemiAutoCallBallToggle.disableInteractions = isNormalPlayer;
+        // buttonSemiAutoCallPocketToggle.disableInteractions = isNormalPlayer;
 
         refreshJoinButtons();
         _RefreshToggleSettings();
@@ -258,6 +347,30 @@ public class MenuManager : UdonSharpBehaviour
             {
                 table._TriggerGameModeChanged(3);
             }
+            else if (button.name == "10Win")
+            {
+                table._TriggerGoalPointsChanged(10);
+            }
+            else if (button.name == "20Win")
+            {
+                table._TriggerGoalPointsChanged(20);
+            }
+            else if (button.name == "30Win")
+            {
+                table._TriggerGoalPointsChanged(30);
+            }
+            else if (button.name == "50Win")
+            {
+                table._TriggerGoalPointsChanged(50);
+            }
+            else if (button.name == "70Win")
+            {
+                table._TriggerGoalPointsChanged(70);
+            }
+            else if (button.name == "100Win")
+            {
+                table._TriggerGoalPointsChanged(100);
+            }
             else if (button.name == "TeamsToggle")
             {
                 table._TriggerTeamsChanged(button.toggleState);
@@ -270,6 +383,32 @@ public class MenuManager : UdonSharpBehaviour
             {
                 table._TriggerNoLockingChanged(!button.toggleState);
             }
+            else if (button.name == "RackSheet")
+            {
+#if TKCH_DEBUG_TOGGLE
+                table._LogInfo($"  name = {button.name}, toggleState = {button.toggleState}");
+#endif
+                table._TriggerRackCondisionChanged(0);
+            }
+            else if (button.name == "WoodFrame")
+            {
+#if TKCH_DEBUG_TOGGLE
+                table._LogInfo($"  name = {button.name}, toggleState = {button.toggleState}");
+#endif
+                table._TriggerRackCondisionChanged(1);
+            }
+            else if (button.name == "SemiAutoCallToggle")
+            {
+                table._TriggerSemiAutoCallChanged(button.toggleState);
+            }
+            // else if (button.name == "SemiAutoCallBallToggle")
+            // {
+            //     table._TriggerSemiAutoCallBallChanged(button.toggleState);
+            // }
+            // else if (button.name == "SemiAutoCallPocketToggle")
+            // {
+            //     table._TriggerSemiAutoCallPocketChanged(button.toggleState);
+            // }
             else if (button.name == "TimeRight")
             {
                 if (selectedTimer > 0)

@@ -1,4 +1,6 @@
-﻿
+﻿//#define TKCH_DEBUG_DESKTOP_BALLORDER
+
+using System;
 using Metaphira.Modules.CameraOverride;
 using UdonSharp;
 using UnityEngine;
@@ -237,6 +239,7 @@ public class DesktopManager : UdonSharpBehaviour
                 renderCuePosition(shotDirection);
                 updateSpinIndicator();
                 updateJumpIndicator();
+                updateCallShotIndicator();
             }
         }
 
@@ -299,6 +302,127 @@ public class DesktopManager : UdonSharpBehaviour
         jumpAngle = Mathf.Clamp(jumpAngle, 0, Mathf.PI / 2);
 
         jumpIndicator.transform.localPosition = new Vector3(-Mathf.Cos(jumpAngle) * 1.1f, 0, Mathf.Sin(jumpAngle) * 1.1f);
+    }
+
+    private int[] pocketOrder = new[] { 0, 1, 5, 3, 2, 4 };
+
+    private int nextPocketOrder(bool asc)
+    {
+        uint pockets = table.pointPocketsLocal;
+        int pocketCount = table.pcketLocations.Length;
+        int id = (asc ? 0 : pocketOrder[pocketOrder.Length - 1]);
+        for (int i = 0; i < pocketCount; i++)
+        {
+            if (((pockets >> i) & 0x1u) != 0)
+            {
+                int current = Array.IndexOf(pocketOrder, i);
+                int next = current + (asc ? 1 : -1);
+                if (next < 0 || pocketCount <= next)
+                {
+                    id = i;
+                    break;
+                }
+
+                id = pocketOrder[next];
+                break;
+            }
+        }
+
+        return id;
+    }
+
+    private int[] ballOrder = { 0, 2, 3, 4, 5, 6, 7, 8, 1, 9, 10, 11, 12, 13, 14, 15 };
+
+    private int nextBallOrder(bool asc)
+    {
+#if TKCH_DEBUG_DESKTOP_BALLORDER
+        table._LogInfo("TKCH DesktopManager::nextBallOrder()");
+#endif
+        int ballCount = ballOrder.Length - 1;
+        int id = (asc ? 2 : ballOrder.Length - 1);
+        int orig = id; // (!asc ? 2 : ballOrder.Length - 1);
+        uint calledBalls = table.calledBallsLocal;
+        uint ballsPocketed = table.ballsPocketedLocal;
+        for (int k = 0; k < ballCount; k++)
+        {
+            int i = k + 1;
+            if (((calledBalls >> i) & 0x1u) != 0)
+            {
+                int current = Array.IndexOf(ballOrder, i);
+                orig = i;
+                int next = current + (asc ? 1 : -1);
+#if TKCH_DEBUG_DESKTOP_BALLORDER
+                table._LogInfo($"  current = {current}, next = {next}");
+#endif
+                if (next < 1 || ballCount < next)
+                {
+#if TKCH_DEBUG_DESKTOP_BALLORDER
+                    table._LogInfo($"  boundary ball id = {id}");
+#endif
+                    id = i;
+                    break;
+                }
+
+                id = ballOrder[next];
+#if TKCH_DEBUG_DESKTOP_BALLORDER
+                table._LogInfo($"  next ball id = {id}");
+#endif
+                break;
+            }
+        }
+
+#if TKCH_DEBUG_DESKTOP_BALLORDER
+        table._LogInfo($"  orig = {orig}");
+#endif
+
+        for (int k = 0; k < ballCount; k++)
+        {
+#if TKCH_DEBUG_DESKTOP_BALLORDER
+            table._LogInfo($"  k = {k}");
+#endif
+            if (((ballsPocketed >> id) & 0x1u) == 0)
+            {
+#if TKCH_DEBUG_DESKTOP_BALLORDER
+                table._LogInfo($"  break (not ballsPocketed)");
+#endif
+                break;
+            }
+            
+#if TKCH_DEBUG_DESKTOP_BALLORDER
+            table._LogInfo($"  ballsPocketed");
+#endif
+
+            int current = Array.IndexOf(ballOrder, id);
+            int next = current + (asc ? 1 : -1);
+#if TKCH_DEBUG_DESKTOP_BALLORDER
+            table._LogInfo($"  current = {current}, next = {next}");
+#endif
+            if (next < 1 || ballCount < next)
+            {
+                id = orig;
+                break;
+            }
+            id = ballOrder[next];
+        }    
+        
+#if TKCH_DEBUG_DESKTOP_BALLORDER
+        table._LogInfo($"  next ball id = {id} return");
+#endif
+        return id;
+    }
+
+    private void updateCallShotIndicator()
+    {
+        if (Input.GetKeyDown(KeyCode.P))
+        { 
+            int id = nextPocketOrder(!(Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)));
+            table._TriggerPocketHit(id, true);
+        }
+        if (Input.GetKeyDown(KeyCode.B))
+        {
+            int id = nextBallOrder(!(Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)));
+            table._TriggerOtherBallHit(id, true);
+        }
     }
 
     private void renderCuePosition(Vector3 dir)
