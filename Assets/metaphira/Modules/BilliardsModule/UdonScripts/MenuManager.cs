@@ -34,8 +34,8 @@ public class MenuManager : UdonSharpBehaviour
     [SerializeField] public UIButton buttonTeamsToggle;
     [SerializeField] public UIButton buttonGuidelineToggle;
     [SerializeField] public UIButton buttonLockingToggle;
-    [SerializeField] public UIButton buttonRackSheet;
-    [SerializeField] public UIButton buttonWoodFrame;
+    [SerializeField] public UIButton buttonRackSheetToggle;
+    [SerializeField] public UIButton buttonWoodFrameToggle;
     [SerializeField] public UIButton buttonSemiAutoCallToggle;
     // [SerializeField] public UIButton buttonSemiAutoCallBallToggle;
     // [SerializeField] public UIButton buttonSemiAutoCallPocketToggle;
@@ -54,6 +54,24 @@ public class MenuManager : UdonSharpBehaviour
     public void _Init(BilliardsModule table_)
     {
         table = table_;
+
+        // if (!table.defaultGameModeToStraight)
+        // {
+        //     button8Ball.gameObject.SetActive(true);
+        //     button9Ball.gameObject.SetActive(true);
+        //     button4Ball.gameObject.SetActive(true);
+        //     button4BallJP.gameObject.SetActive(true);
+        //     button4BallKR.gameObject.SetActive(true);
+        //     button10Win.gameObject.SetActive(false);
+        //     button20Win.gameObject.SetActive(false);
+        //     button30Win.gameObject.SetActive(false);
+        //     button50Win.gameObject.SetActive(false);
+        //     button70Win.gameObject.SetActive(false);
+        //     button100Win.gameObject.SetActive(false);
+        //     buttonRackSheetToggle.gameObject.SetActive(false);
+        //     buttonWoodFrameToggle.gameObject.SetActive(false);
+        //     buttonSemiAutoCallToggle.gameObject.SetActive(false);
+        // }
         
         _RefreshTimer();
         _RefreshToggleSettings();
@@ -150,7 +168,7 @@ public class MenuManager : UdonSharpBehaviour
                 }
                 button4BallJP.gameObject.SetActive(false);
                 button4BallKR.gameObject.SetActive(false);
-                table.scoreScreen.UpdateGameNameWithNumber("Straight Pool 14-1", goalPoints);
+                if (!ReferenceEquals(null, table.scoreScreen)) table.scoreScreen.UpdateGameNameWithNumber("Straight Pool 14-1", goalPoints);
                 break;
         }
     }
@@ -226,7 +244,7 @@ public class MenuManager : UdonSharpBehaviour
                     teamName += "\n" + name;
                 }
             }
-            table.scoreScreen.UpdateTeamName(i, teamName);
+            if (!ReferenceEquals(null, table.scoreScreen)) table.scoreScreen.UpdateTeamName(i, teamName);
         }
 
         refreshJoinButtons();
@@ -250,18 +268,18 @@ public class MenuManager : UdonSharpBehaviour
         buttonTeamsToggle._SetButtonToggle(table.teamsLocal);
         buttonGuidelineToggle._SetButtonToggle(!table.noGuidelineLocal);
         buttonLockingToggle._SetButtonToggle(!table.noLockingLocal);
-        buttonRackSheet._ResetPushButton();
-        buttonWoodFrame._ResetPushButton();
+        buttonRackSheetToggle._ResetPushButton();
+        buttonWoodFrameToggle._ResetPushButton();
         buttonSemiAutoCallToggle._SetButtonToggle(table.semiAutoCallBallLocal);
         // buttonSemiAutoCallBallToggle._SetButtonToggle(table.semiAutoCallBallLocal);
         // buttonSemiAutoCallPocketToggle._SetButtonToggle(table.semiAutoCallPocketLocal);
         if (table.rackConditionLocal == 0)
         {
-            buttonRackSheet._SetButtonPushed();
+            buttonRackSheetToggle._SetButtonPushed();
         }
         else
         {
-            buttonWoodFrame._SetButtonPushed();
+            buttonWoodFrameToggle._SetButtonPushed();
         }
 
         _RefreshPlayerList();
@@ -286,8 +304,8 @@ public class MenuManager : UdonSharpBehaviour
         buttonLockingToggle.disableInteractions = isNormalPlayer;
         buttonTimerLeft.disableInteractions = isNormalPlayer;
         buttonTimerRight.disableInteractions = isNormalPlayer;
-        buttonRackSheet.disableInteractions = isNormalPlayer;
-        buttonWoodFrame.disableInteractions = isNormalPlayer;
+        buttonRackSheetToggle.disableInteractions = isNormalPlayer;
+        buttonWoodFrameToggle.disableInteractions = isNormalPlayer;
         buttonSemiAutoCallToggle.disableInteractions = isNormalPlayer;
         // buttonSemiAutoCallBallToggle.disableInteractions = isNormalPlayer;
         // buttonSemiAutoCallPocketToggle.disableInteractions = isNormalPlayer;
@@ -383,14 +401,14 @@ public class MenuManager : UdonSharpBehaviour
             {
                 table._TriggerNoLockingChanged(!button.toggleState);
             }
-            else if (button.name == "RackSheet")
+            else if (button.name == "RackSheetToggle")
             {
 #if TKCH_DEBUG_TOGGLE
                 table._LogInfo($"  name = {button.name}, toggleState = {button.toggleState}");
 #endif
                 table._TriggerRackCondisionChanged(0);
             }
-            else if (button.name == "WoodFrame")
+            else if (button.name == "WoodFrameToggle")
             {
 #if TKCH_DEBUG_TOGGLE
                 table._LogInfo($"  name = {button.name}, toggleState = {button.toggleState}");

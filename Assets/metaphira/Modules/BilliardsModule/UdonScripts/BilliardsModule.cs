@@ -134,6 +134,7 @@ public class BilliardsModule : UdonSharpBehaviour
     [SerializeField] Material calledBallMarkerWhite;
 
     [Header("Straight")]
+    [SerializeField] public bool defaultGameModeToStraight;
     [SerializeField] public BilliardsScoreScreen scoreScreen;
     [SerializeField] public GameObject markerHeadSpot;
     [SerializeField] public GameObject markerCenterSpot;
@@ -349,9 +350,39 @@ public class BilliardsModule : UdonSharpBehaviour
     
     private void OnEnable()
     {
-        // scoreScreen.SetPointSigned(false);
-        scoreScreen.SetTeamInvalidPocketBallCountEmptyTextOnZero(0, true);
-        scoreScreen.SetTeamInvalidPocketBallCountEmptyTextOnZero(1, true);
+        if (defaultGameModeToStraight)
+        {
+            this.transform.Find("intl.menu/SettingsMenu/Backboard").gameObject.SetActive(false);
+            this.transform.Find("intl.menu/SettingsMenu/8Ball").gameObject.SetActive(false);
+            this.transform.Find("intl.menu/SettingsMenu/9Ball").gameObject.SetActive(false);
+            this.transform.Find("intl.menu/SettingsMenu/4Ball").gameObject.SetActive(false);
+            this.transform.Find("intl.menu/SettingsMenu/4BallJP").gameObject.SetActive(false);
+            this.transform.Find("intl.menu/SettingsMenu/4BallKR").gameObject.SetActive(false);
+        }
+        else
+        {
+            this.transform.Find("intl.menu/SettingsMenu/Backboard_Straight").gameObject.SetActive(false);
+            this.transform.Find("intl.menu/SettingsMenu/10Win").gameObject.SetActive(false);
+            this.transform.Find("intl.menu/SettingsMenu/20Win").gameObject.SetActive(false);
+            this.transform.Find("intl.menu/SettingsMenu/30Win").gameObject.SetActive(false);
+            this.transform.Find("intl.menu/SettingsMenu/50Win").gameObject.SetActive(false);
+            this.transform.Find("intl.menu/SettingsMenu/70Win").gameObject.SetActive(false);
+            this.transform.Find("intl.menu/SettingsMenu/100Win").gameObject.SetActive(false);
+            this.transform.Find("intl.menu/SettingsMenu/RackSheetToggle").gameObject.SetActive(false);
+            this.transform.Find("intl.menu/SettingsMenu/WoodFrameToggle").gameObject.SetActive(false);
+            this.transform.Find("intl.menu/SettingsMenu/SemiAutoCallToggle").gameObject.SetActive(false);
+            this.transform.Find("intl.menu/SettingsMenu/RackSheet").gameObject.SetActive(false);
+            this.transform.Find("intl.menu/SettingsMenu/WoodRackFrame").gameObject.SetActive(false);
+            this.transform.Find("intl.desktop/desktop/desktop_callshot").gameObject.SetActive(false);
+        }
+
+        if (!ReferenceEquals(null, scoreScreen))
+        {
+            scoreScreen.Init();
+            // scoreScreen.SetPointSigned(false);
+            scoreScreen.SetTeamInvalidPocketBallCountEmptyTextOnZero(0, true);
+            scoreScreen.SetTeamInvalidPocketBallCountEmptyTextOnZero(1, true);
+        }
         logLabel = string.IsNullOrEmpty(logLabel) ? string.Empty : " " + logLabel;
 
         _LogInfo("initializing billiards module");
@@ -373,8 +404,9 @@ public class BilliardsModule : UdonSharpBehaviour
             balls[i].GetComponentInChildren<Repositioner>(true)._Init(this, i);
         }
 
-        gameModeLocal = 4;
-        isStraight = true;
+        gameModeLocal = defaultGameModeToStraight ? 4u : 0u;
+        isStraight = gameModeLocal == 4u;
+        is8Ball = gameModeLocal == 0u;
         rackConditionLocal = 1;
         semiAutoCallBallLocal = true;
         semiAutoCallPocketLocal = true;
@@ -511,8 +543,11 @@ public class BilliardsModule : UdonSharpBehaviour
     {
         if (lobbyOpen) return;
 
-        scoreScreen.Clear();
-        Array.Copy(scoreScreen.EncodeScoreSyncValues(), networkingManager.scoreSyncRows, networkingManager.scoreSyncRows.Length);
+        if (!ReferenceEquals(null, scoreScreen))
+        {
+            scoreScreen.Clear();
+            Array.Copy(scoreScreen.EncodeScoreSyncValues(), networkingManager.scoreSyncRows, networkingManager.scoreSyncRows.Length);
+        }
 
         networkingManager._OnLobbyOpened();
     }
@@ -981,29 +1016,32 @@ public class BilliardsModule : UdonSharpBehaviour
         // propagate valid players second
         onRemotePlayersChanged(networkingManager.playerNamesSynced);
 
-        bool scoreUpdate = true;
-        if (lobbyOpen || gameLive)
+        if (!ReferenceEquals(null, scoreScreen))
         {
-            if (networkingManager.stateIdSynced <= 1)
+            bool scoreUpdate = true;
+            if (lobbyOpen || gameLive)
             {
-                scoreScreen.Clear();
-                scoreUpdate = false;
+                if (networkingManager.stateIdSynced <= 1)
+                {
+                    scoreScreen.Clear();
+                    scoreUpdate = false;
 #if TKCH_DEBUG_SCORE
-                _LogInfo($"  EmptyTextOnZero 01 teamIdLocal = {teamIdLocal}, teamColorLocal = {teamColorLocal}");
+                    _LogInfo($"  EmptyTextOnZero 01 teamIdLocal = {teamIdLocal}, teamColorLocal = {teamColorLocal}");
 #endif
+                }
             }
-        }
-        
+            
 #if TKCH_DEBUG_SCORE
-        _LogInfo($"  scoreUpdate = {scoreUpdate}");
+            _LogInfo($"  scoreUpdate = {scoreUpdate}");
 #endif
-        if (scoreUpdate)
-        {
+            if (scoreUpdate)
+            {
 #if TKCH_DEBUG_SCORE
-            _LogInfo($"  networkingManager.scoreSyncRows = {networkingManager.scoreSyncRows[0]:X8}-{networkingManager.scoreSyncRows[1]:X8}");
-            _LogInfo($"                                    {networkingManager.scoreSyncRows[2]:X8}-{networkingManager.scoreSyncRows[3]:X8}");
+                _LogInfo($"  networkingManager.scoreSyncRows = {networkingManager.scoreSyncRows[0]:X8}-{networkingManager.scoreSyncRows[1]:X8}");
+                _LogInfo($"                                    {networkingManager.scoreSyncRows[2]:X8}-{networkingManager.scoreSyncRows[3]:X8}");
 #endif
-            scoreScreen.DecodeScoreSyncValues(networkingManager.scoreSyncRows);
+                scoreScreen.DecodeScoreSyncValues(networkingManager.scoreSyncRows);
+            }
         }
         
 #if TKCH_DEBUG_TIMEOUT || TKCH_DEBUG_SPECIAL_PENALTY
@@ -1658,7 +1696,7 @@ public class BilliardsModule : UdonSharpBehaviour
             return;
         }
 
-        if (afterBreak && 0 < denyBallsLocal)
+        if (isStraight && afterBreak && 0 < denyBallsLocal)
         {
             currentPhysicsManager.SetProgramVariable("cueBallKichenLineOverCheck", true);
         }
@@ -1909,6 +1947,8 @@ public class BilliardsModule : UdonSharpBehaviour
 
     public void _TriggerCushion(int id, Vector3 pos)
     {
+        if (!isStraight) return;
+        ;
         if (isOpeningBreakLocal && !afterBreak) //networkingManager.stateIdSynced == 2)
         {
             if (0 != firstHit) // if (0 < id)
@@ -2203,7 +2243,7 @@ public class BilliardsModule : UdonSharpBehaviour
                 cushionObjectiveBallsOnBreak &= ~0x1u;
 
                 reBreakAllowed = isOpeningBreakLocal && !isObjectiveSink && // !isAnyPocketSink &&
-                    !afterBreak && (SoftwareFallback(cushionObjectiveBallsOnBreak) < 2 || !isCueBallCushionOnBreak); // 4);
+                    !afterBreak && (SoftwareFallback(cushionObjectiveBallsOnBreak) < 2 || (!isCueBallCushionOnBreak && !isScratch)); // 4);
 
 #if TKCH_DEBUG_OPENING_BREAK
                 _LogInfo($"  cushionObjectiveBallsOnBreak = {cushionObjectiveBallsOnBreak:X4}");
@@ -4325,6 +4365,8 @@ public class BilliardsModule : UdonSharpBehaviour
         _LogInfo($"  shotCountsLocal = {shotCountsLocal[0]}-{shotCountsLocal[1]}");
         _LogInfo($"  shotSuccessCountsLocal = {shotSuccessCountsLocal[0]}-{shotSuccessCountsLocal[1]}");
 #endif
+        if (ReferenceEquals(null, scoreScreen)) return;
+
         for (int teamId = 0; teamId < 2; teamId++)
         {
             uint[] encodeScoreSyncValues = null;
@@ -4380,6 +4422,8 @@ public class BilliardsModule : UdonSharpBehaviour
         _LogInfo($"  shotCounts = {shotCounts[0]}-{shotCounts[1]}");
         _LogInfo($"  shotSuccessCounts = {shotSuccessCounts[0]}-{shotSuccessCounts[1]}");
 #endif
+        if (ReferenceEquals(null, scoreScreen)) return;
+
         for (int i = 0; i < 2; i++)
         {
             uint[] encodeScoreSyncValues = null;
