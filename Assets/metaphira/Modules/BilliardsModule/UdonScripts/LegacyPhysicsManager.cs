@@ -620,6 +620,7 @@ public class LegacyPhysicsManager : UdonSharpBehaviour
         Vector3 source_v = balls_V[id];
         if (Vector3.Dot(source_v, N) > 0.0f)
         {
+            table._TriggerCushion(id, balls_P[id]);
             return;
         }
 
@@ -664,6 +665,8 @@ public class LegacyPhysicsManager : UdonSharpBehaviour
         // Unrotate result
         balls_V[id] += rb * V1;
         balls_W[id] += rb * W1;
+        
+        table._TriggerCushion(id, balls_P[id]);
     }
 
 

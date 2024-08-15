@@ -18,7 +18,7 @@ using Metaphira.Modules.CameraOverride;
 public class BilliardsModule : UdonSharpBehaviour
 {
     [NonSerialized] public readonly string[] DEPENDENCIES = new string[] { nameof(CameraOverrideModule) };
-    [NonSerialized] public readonly string VERSION = "6.0.0";
+    [NonSerialized] public readonly string VERSION = "6.0.0 (no cushion foul)";
 
     // table model properties
     [NonSerialized] public float k_TABLE_WIDTH; // horizontal span of table
@@ -88,6 +88,10 @@ public class BilliardsModule : UdonSharpBehaviour
     private readonly int[] break_rows_9ball = { 0, 1, 2, 1, 0 };
 
     #region InspectorValues
+    [Header("NoCushionFoul Option")]
+    [SerializeField] public bool useNoCushionFoulOption;
+    [SerializeField] public bool enableCushionTouchEffect;
+
     [Header("Debug")]
     [SerializeField] public string logLabel;
 
@@ -172,6 +176,7 @@ public class BilliardsModule : UdonSharpBehaviour
     [NonSerialized] public bool teamsLocal;
     [NonSerialized] public bool noGuidelineLocal;
     [NonSerialized] public bool noLockingLocal;
+    [NonSerialized] public bool noCushionFoulLocal;
     [NonSerialized] public uint ballsPocketedLocal;
     [NonSerialized] public uint teamIdLocal;
     [NonSerialized] public uint fourBallCueBallLocal;
@@ -199,6 +204,7 @@ public class BilliardsModule : UdonSharpBehaviour
     private int firstHit = 0;
     private int secondHit = 0;
     private int thirdHit = 0;
+    private int cushionAfterFirstHit = 0;
 
     private bool fbMadePoint = false;
     private bool fbMadeFoul = false;
@@ -253,6 +259,8 @@ public class BilliardsModule : UdonSharpBehaviour
         {
             balls[i].GetComponentInChildren<Repositioner>(true)._Init(this, i);
         }
+
+        networkingManager.noCushionFoulSynced = noCushionFoulLocal = useNoCushionFoulOption;
 
         networkingManager._Init(this);
         practiceManager._Init(this);
@@ -388,6 +396,11 @@ public class BilliardsModule : UdonSharpBehaviour
     public void _TriggerNoLockingChanged(bool noLockingEnabled)
     {
         networkingManager._OnNoLockingChanged(noLockingEnabled);
+    }
+
+    public void _TriggerNoCushionFoulChanged(bool noCushionFoulEnabled)
+    {
+        networkingManager._OnNoCushionFoulChanged(noCushionFoulEnabled);
     }
 
     public void _TriggerTimerChanged(uint timerSelected)
@@ -625,7 +638,8 @@ public class BilliardsModule : UdonSharpBehaviour
             networkingManager.timerSynced,
             networkingManager.teamsSynced,
             networkingManager.noGuidelineSynced,
-            networkingManager.noLockingSynced
+            networkingManager.noLockingSynced,
+            networkingManager.noCushionFoulSynced
         );
 
         if (gameStateLocal != networkingManager.gameStateSynced && networkingManager.gameStateSynced == 1)
@@ -706,20 +720,21 @@ public class BilliardsModule : UdonSharpBehaviour
         }
     }
 
-    private void onRemoteGameSettingsUpdated(uint gameModeSynced, uint timerSynced, bool teamsSynced, bool noGuidelineSynced, bool noLockingSynced)
+    private void onRemoteGameSettingsUpdated(uint gameModeSynced, uint timerSynced, bool teamsSynced, bool noGuidelineSynced, bool noLockingSynced, bool noCushionFoulSynced)
     {
         if (
             gameModeLocal == gameModeSynced &&
             timerLocal == timerSynced &&
             teamsLocal == teamsSynced &&
             noGuidelineLocal == noGuidelineSynced &&
-            noLockingLocal == noLockingSynced
+            noLockingLocal == noLockingSynced &&
+            noCushionFoulLocal == noCushionFoulSynced
         )
         {
             return;
         }
 
-        _LogInfo($"onRemoteGameSettingsUpdated gameMode={gameModeSynced} timer={timerSynced} teams={teamsSynced} guideline={!noGuidelineSynced} locking={!noLockingSynced}");
+        _LogInfo($"onRemoteGameSettingsUpdated gameMode={gameModeSynced} timer={timerSynced} teams={teamsSynced} guideline={!noGuidelineSynced} locking={!noLockingSynced} nocushionfoul={noCushionFoulSynced}");
 
         if (gameModeLocal != gameModeSynced)
         {
@@ -757,6 +772,12 @@ public class BilliardsModule : UdonSharpBehaviour
         if (noLockingLocal != noLockingSynced)
         {
             noLockingLocal = noLockingSynced;
+            refreshToggles = true;
+        }
+
+        if (noCushionFoulLocal != noCushionFoulSynced)
+        {
+            noCushionFoulLocal = noCushionFoulSynced;
             refreshToggles = true;
         }
 
@@ -1121,6 +1142,7 @@ public class BilliardsModule : UdonSharpBehaviour
         firstHit = 0;
         secondHit = 0;
         thirdHit = 0;
+        cushionAfterFirstHit = 0;
         fbMadePoint = false;
         fbMadeFoul = false;
         ballsPocketedOrig = ballsPocketedLocal;
@@ -1235,6 +1257,23 @@ public class BilliardsModule : UdonSharpBehaviour
         }
     }
 
+    public void _TriggerCushion(int id, Vector3 pos)
+    {
+        if (is4Ball || !noCushionFoulLocal) return;
+
+        if (ballsPocketedLocal == ballsPocketedOrig)
+        {
+            if (0 != firstHit)
+            {
+                if (0 == cushionAfterFirstHit)
+                {
+                    graphicsManager._SpawnCushionTouch(pos);
+                }
+                cushionAfterFirstHit++;
+            }
+        }
+    }
+
     public void _TriggerPocketBall(int id)
     {
         uint total = 0U;
@@ -1335,6 +1374,7 @@ public class BilliardsModule : UdonSharpBehaviour
 
                 // Calculate if objective was not hit first
                 bool isWrongHit = ((0x1U << firstHit) & bmask) == 0;
+                bool isNoCushion = noCushionFoulLocal && !isObjectiveSink && !isOpponentSink && cushionAfterFirstHit == 0;
 
                 bool is8Sink = (ballsPocketedLocal & 0x2U) == 0x2U;
 
@@ -1347,7 +1387,7 @@ public class BilliardsModule : UdonSharpBehaviour
                 }
 
                 winCondition = isSetComplete && is8Sink;
-                foulCondition = isScratch || isWrongHit;
+                foulCondition = isScratch || isWrongHit || isNoCushion;
 
                 deferLossCondition = is8Sink;
             }
@@ -1369,9 +1409,11 @@ public class BilliardsModule : UdonSharpBehaviour
                 isOpponentSink = false;
                 deferLossCondition = false;
 
-                foulCondition = isWrongHit || isScratch;
+                // foulCondition = isWrongHit || isScratch;
 
-                // TODO: Implement rail contact requirement
+                // Implement rail contact requirement
+                bool isNoCushion = noCushionFoulLocal && !isObjectiveSink && cushionAfterFirstHit == 0;
+                foulCondition = isWrongHit || isScratch || isNoCushion;
             }
             else /*if (is4Ball)*/
             {

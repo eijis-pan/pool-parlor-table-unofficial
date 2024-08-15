@@ -8,6 +8,9 @@ using VRC.Udon;
 [UdonBehaviourSyncMode(BehaviourSyncMode.NoVariableSync)]
 public class GraphicsManager : UdonSharpBehaviour
 {
+    [Header("Pocket Billiard Additional")]
+    [SerializeField] GameObject cushionTouch;
+
     [Header("4 Ball")]
     [SerializeField] GameObject fourBallPoint;
     [SerializeField] Mesh fourBallMeshPlus;
@@ -48,6 +51,9 @@ public class GraphicsManager : UdonSharpBehaviour
 
     private bool fourBallPointActive;
     private float fourBallPointTime;
+
+    private bool cushionTouchActive;
+    private float cushionTouchTime;
 
     private float introAnimationTime = 0.0f;
 
@@ -106,6 +112,9 @@ public class GraphicsManager : UdonSharpBehaviour
             meshOverrideRegular[i + 1] = balls[13 + i].GetComponent<MeshFilter>().sharedMesh;
         }
 
+        cushionTouchActive = false;
+        cushionTouchTime = 0;
+
         _DisableObjects();
     }
 
@@ -123,6 +132,7 @@ public class GraphicsManager : UdonSharpBehaviour
     {
         tickBallPositions();
         tickFourBallPoint();
+        tickCushionTouch();
         tickIntroAnimation();
         tickTableColor();
         tickLobbyStatus();
@@ -175,6 +185,38 @@ public class GraphicsManager : UdonSharpBehaviour
         {
             fourBallPointActive = false;
             fourBallPoint.SetActive(false);
+        }
+    }
+
+    private void tickCushionTouch()
+    {
+        if (!table.enableCushionTouchEffect || !cushionTouchActive) return;
+
+        // Evaluate time
+        cushionTouchTime += Time.deltaTime * 0.25f;
+
+        // Sustained step
+        float s = Mathf.Max(cushionTouchTime - 0.1f, 0.0f);
+        float v = Mathf.Min(cushionTouchTime * cushionTouchTime * 100.0f, 21.0f * s * Mathf.Exp(-15.0f * s));
+
+        // Exponential step
+        float e = Mathf.Exp(-17.0f * Mathf.Pow(Mathf.Max(cushionTouchTime - 1.2f, 0.0f), 3.0f));
+
+        float scale = e * v * 2.0f;
+
+        // Set scale
+        cushionTouch.transform.localScale = new Vector3(scale, scale, scale);
+
+        // Set position
+        Vector3 temp = cushionTouch.transform.localPosition;
+        temp.y = cushionTouchTime * 0.5f;
+        cushionTouch.transform.localPosition = temp;
+
+        // Particle death
+        if (cushionTouchTime > 2.0f)
+        {
+            cushionTouchActive = false;
+            cushionTouch.SetActive(false);
         }
     }
 
@@ -410,6 +452,19 @@ public class GraphicsManager : UdonSharpBehaviour
         fourBallPoint.transform.localPosition = pos;
         fourBallPoint.transform.localScale = Vector3.zero;
         fourBallPoint.transform.LookAt(Networking.LocalPlayer.GetPosition());
+    }
+
+    public void _SpawnCushionTouch(Vector3 pos)
+    {
+        if (!table.enableCushionTouchEffect) return;
+        
+        cushionTouch.SetActive(true);
+        cushionTouchActive = true;
+        cushionTouchTime = 0.1f;
+
+        cushionTouch.transform.localPosition = pos;
+        cushionTouch.transform.localScale = Vector3.zero;
+        cushionTouch.transform.LookAt(Networking.LocalPlayer.GetPosition());
     }
 
     public void _FlashTableLight()
@@ -747,6 +802,7 @@ int uniform_cue_colour;
         scorecardHolder.SetActive(false);
         table.marker9ball.SetActive(false);
         fourBallPoint.SetActive(false);
+        cushionTouch.SetActive(false);
         table.transform.Find("intl.controls/undo").gameObject.SetActive(false);
         table.transform.Find("intl.controls/redo").gameObject.SetActive(false);
         table.transform.Find("intl.controls/skipturn").gameObject.SetActive(false);

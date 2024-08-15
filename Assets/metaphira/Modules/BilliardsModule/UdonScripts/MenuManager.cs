@@ -26,6 +26,7 @@ public class MenuManager : UdonSharpBehaviour
     [SerializeField] public UIButton buttonTeamsToggle;
     [SerializeField] public UIButton buttonGuidelineToggle;
     [SerializeField] public UIButton buttonLockingToggle;
+    [SerializeField] public UIButton buttonNoCushionFoulToggle;
 
     [SerializeField] public UIButton buttonLeave;
     [SerializeField] public UIButton buttonPlay;
@@ -41,6 +42,11 @@ public class MenuManager : UdonSharpBehaviour
     public void _Init(BilliardsModule table_)
     {
         table = table_;
+
+        if (!table.useNoCushionFoulOption)
+        {
+            buttonNoCushionFoulToggle.gameObject.SetActive(false);
+        }
         
         _RefreshTimer();
         _RefreshToggleSettings();
@@ -185,6 +191,7 @@ public class MenuManager : UdonSharpBehaviour
         buttonTeamsToggle._SetButtonToggle(table.teamsLocal);
         buttonGuidelineToggle._SetButtonToggle(!table.noGuidelineLocal);
         buttonLockingToggle._SetButtonToggle(!table.noLockingLocal);
+        buttonNoCushionFoulToggle._SetButtonToggle(table.noCushionFoulLocal);
 
         _RefreshPlayerList();
     }
@@ -200,6 +207,7 @@ public class MenuManager : UdonSharpBehaviour
         buttonTeamsToggle.disableInteractions = isNormalPlayer;
         buttonGuidelineToggle.disableInteractions = isNormalPlayer;
         buttonLockingToggle.disableInteractions = isNormalPlayer;
+        buttonNoCushionFoulToggle.disableInteractions = isNormalPlayer;
         buttonTimerLeft.disableInteractions = isNormalPlayer;
         buttonTimerRight.disableInteractions = isNormalPlayer;
 
@@ -269,6 +277,10 @@ public class MenuManager : UdonSharpBehaviour
             else if (button.name == "LockingToggle")
             {
                 table._TriggerNoLockingChanged(!button.toggleState);
+            }
+            else if (button.name == "NoCushionFoulToggle")
+            {
+                table._TriggerNoCushionFoulChanged(button.toggleState);
             }
             else if (button.name == "TimeRight")
             {

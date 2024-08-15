@@ -75,6 +75,9 @@ public class NetworkingManager : UdonSharpBehaviour
     // whether or not the cue can be locked
     [UdonSynced] [NonSerialized] public bool noLockingSynced;
 
+    // whether or not the no cushion foul
+    [UdonSynced] [NonSerialized] public bool noCushionFoulSynced;
+
     // scores if game state is 2 or 3 (4ball)
     [UdonSynced] [NonSerialized] public int[] fourBallScoresSynced = new int[2];
 
@@ -424,6 +427,13 @@ public class NetworkingManager : UdonSharpBehaviour
     public void _OnNoLockingChanged(bool noLockingEnabled)
     {
         noLockingSynced = noLockingEnabled;
+
+        bufferMessages(false);
+    }
+
+    public void _OnNoCushionFoulChanged(bool noCushionFoulEnabled)
+    {
+        noCushionFoulSynced = noCushionFoulEnabled;
 
         bufferMessages(false);
     }
