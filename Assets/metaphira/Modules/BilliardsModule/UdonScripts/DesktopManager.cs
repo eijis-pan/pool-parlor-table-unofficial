@@ -1,4 +1,6 @@
-﻿
+﻿//#define TKCH_DEBUG_CALLSHOT_BALL
+
+using System;
 using Metaphira.Modules.CameraOverride;
 using UdonSharp;
 using UnityEngine;
@@ -20,6 +22,9 @@ public class DesktopManager : UdonSharpBehaviour
     [SerializeField] private GameObject jumpIndicator;
     [SerializeField] private GameObject powerIndicator;
     [SerializeField] private GameObject pressE;
+    [SerializeField] private GameObject callShot;
+    [SerializeField] private GameObject pushOut;
+    [SerializeField] private GameObject pushOutDoing;
 
     private BilliardsModule table;
 
@@ -53,6 +58,8 @@ public class DesktopManager : UdonSharpBehaviour
         table = table_;
         cursorClampX = table.k_TABLE_WIDTH;
         cursorClampZ = table.k_TABLE_HEIGHT;
+        Transform callShot = table.transform.Find("intl.desktop/desktop/desktop_callShot");
+        Transform pushOut = table.transform.Find("intl.desktop/desktop/desktop_pushOut");
     }
 
     public void _OnGameStarted()
@@ -237,12 +244,16 @@ public class DesktopManager : UdonSharpBehaviour
                 renderCuePosition(shotDirection);
                 updateSpinIndicator();
                 updateJumpIndicator();
+                if (table.requireCallShotLocal) updateCallShotIndicator();
+                if (table.enablePushOutLocal) updatePushOutIndicator();
             }
         }
 
         cursorIndicator.transform.localPosition = cursor;
         powerIndicator.transform.localScale = new Vector3(1.0f - (power * 2.0f), 1.0f, 1.0f);
 
+        pushOutDoing.SetActive(table.pushOutStateLocal == table.PUSHOUT_DOING);
+        
         bool hitCtrlNow = Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.RightControl);
         bool hitCtrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
         bool hitZNow = Input.GetKeyDown(KeyCode.Z);
@@ -299,6 +310,174 @@ public class DesktopManager : UdonSharpBehaviour
         jumpAngle = Mathf.Clamp(jumpAngle, 0, Mathf.PI / 2);
 
         jumpIndicator.transform.localPosition = new Vector3(-Mathf.Cos(jumpAngle) * 1.1f, 0, Mathf.Sin(jumpAngle) * 1.1f);
+    }
+
+    private int[] pocketOrder = new[] { 0, 1, 5, 3, 2, 4 };
+
+    private int nextPocketOrder(bool asc)
+    {
+        uint pockets = table.pointPocketsLocal;
+        int pocketCount = table.pcketLocations.Length;
+        int id = (asc ? 0 : pocketOrder[pocketOrder.Length - 1]);
+        for (int i = 0; i < pocketCount; i++)
+        {
+            if (((pockets >> i) & 0x1u) != 0)
+            {
+                int current = Array.IndexOf(pocketOrder, i);
+                int next = current + (asc ? 1 : -1);
+                if (next < 0 || pocketCount <= next)
+                {
+                    id = i;
+                    break;
+                }
+
+                id = pocketOrder[next];
+                break;
+            }
+        }
+
+        return id;
+    }
+
+    private int nextBallOrder(bool asc)
+    {
+#if EIJIS_DEBUG_BALLORDER
+        table._LogInfo($"DesktopManager::nextBallOrder(asc = {asc})");
+#endif
+        int id = 0;
+        uint calledBalls = table.calledBallsLocal;
+        for (int i = 1; i < table.ballsP.Length; i++)
+        {
+            if (((calledBalls >> i) & 0x1u) != 0)
+            {
+                id = i;
+                break;
+            }
+        }
+#if EIJIS_DEBUG_BALLORDER
+        table._LogInfo($"  before called ball id = {id}");
+#endif
+
+        uint ballsPocketed = table.ballsPocketedLocal;
+        float before_x = table.ballsP[id].x;
+        float before_z = table.ballsP[id].z;
+        float nearest_x = asc ? float.MaxValue : float.MinValue;
+        float nearest_z = asc ? float.MaxValue : float.MinValue;
+        int farestId = 0;
+        float farest_x = asc ? float.MaxValue : float.MinValue;
+        float farest_z = asc ? float.MaxValue : float.MinValue;
+        for (int i = 1; i <= table.ballsLengthByPocketGame; i++)
+        {
+            if (i == id)
+            {
+                continue;
+            }
+            
+            if (((ballsPocketed >> i) & 0x1u) != 0)
+            {
+                continue;
+            }
+
+            float current_x = table.ballsP[i].x;
+            float current_z = table.ballsP[i].z;
+#if EIJIS_DEBUG_BALLORDER
+            // table._LogInfo($"  before_x = {before_x}, current_x = {current_x}");
+#endif
+            if ((asc && before_x < current_x) || (!asc && before_x > current_x))
+            {
+                if ((asc && current_x < nearest_x) || (!asc && current_x > nearest_x))
+                {
+                    nearest_x = current_x;
+                    id = i;
+#if EIJIS_DEBUG_BALLORDER
+                    // table._LogInfo($"  found ball by x id = {id}");
+#endif
+                }
+                else if (current_x == nearest_x)
+                {
+#if EIJIS_DEBUG_BALLORDER
+                    // table._LogInfo($"  before_z = {before_z}, current_z = {current_z}");
+#endif
+                    if ((asc && before_z < current_z) || (!asc && before_z > current_z))
+                    {
+                        if ((asc && current_z < nearest_z) || (!asc && current_z > nearest_z))
+                        {
+                            nearest_z = current_z;
+                            id = i;
+#if EIJIS_DEBUG_BALLORDER
+                            // table._LogInfo($"  found ball by z id = {id}");
+#endif
+                        }
+                    }
+                }
+            }
+            
+#if EIJIS_DEBUG_BALLORDER
+            table._LogInfo($"  farest_x = {farest_x}, current_x = {current_x}");
+#endif
+            if ((!asc && farest_x < current_x) || (asc && farest_x > current_x))
+            {
+                farest_x = current_x;
+                farestId = i;
+#if EIJIS_DEBUG_BALLORDER
+                table._LogInfo($"  found ball by x farestId = {farestId}");
+#endif
+            }
+            else if (current_x == farest_x)
+            {
+#if EIJIS_DEBUG_BALLORDER
+                table._LogInfo($"  farest_z = {farest_z}, current_z = {current_z}");
+#endif
+                if ((!asc && farest_z < current_z) || (asc && farest_z > current_z))
+                {
+                    farest_z = current_z;
+                    farestId = i;
+#if EIJIS_DEBUG_BALLORDER
+                    table._LogInfo($"  found ball by z farestId = {farestId}");
+#endif
+                }
+            }
+        }
+
+#if EIJIS_DEBUG_BALLORDER
+        table._LogInfo($"  nearest_x = {nearest_x}");
+        table._LogInfo($"  reverse side farestId = {farestId}");
+#endif
+        if (nearest_x == float.MaxValue || nearest_x == float.MinValue)
+        {
+            id = farestId;
+        }
+
+        return id;
+    }
+
+    private void updateCallShotIndicator()
+    {
+        if ((!(table.is8Ball || table.is9Ball || table.is10Ball)) || !table.requireCallShotLocal) return;
+        
+        if (Input.GetKeyDown(KeyCode.P))
+        { 
+            int id = nextPocketOrder(!(Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)));
+            table._TriggerPocketHit(id, true);
+        }
+        if (Input.GetKeyDown(KeyCode.B))
+        {
+            int id = nextBallOrder(!(Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)));
+#if TKCH_DEBUG_CALLSHOT_BALL
+            table._LogInfo($"  nextBallOrder id = {id}");
+#endif
+            table._TriggerOtherBallHit(id, true);
+        }
+    }
+
+    private void updatePushOutIndicator()
+    {
+        if (!pushOut.activeSelf) return;
+        
+        if (Input.GetKeyDown(KeyCode.O))
+        { 
+            table._PushOut();
+        }
     }
 
     private void renderCuePosition(Vector3 dir)
@@ -404,5 +583,21 @@ public class DesktopManager : UdonSharpBehaviour
     public bool _IsShooting()
     {
         return canShoot;
+    }
+
+    public void _CallShotSetActive(bool show)
+    {
+        callShot.SetActive(show);
+    }
+
+    public void _PushOutSetActive(bool show)
+    {
+        pushOut.SetActive(show);
+    }
+
+    public void _ChangeCallShotPushOut(bool showCallShot)
+    {
+        callShot.SetActive(showCallShot);
+        pushOut.SetActive(!showCallShot);
     }
 }

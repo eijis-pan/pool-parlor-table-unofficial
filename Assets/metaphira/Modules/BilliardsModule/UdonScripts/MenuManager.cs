@@ -1,4 +1,6 @@
-﻿using System;
+﻿// #define TKCH_DEBUG_TOGGLE
+
+using System;
 using UdonSharp;
 using UnityEngine;
 using UnityEngine.UI;
@@ -18,6 +20,7 @@ public class MenuManager : UdonSharpBehaviour
 
     [SerializeField] public UIButton button8Ball;
     [SerializeField] public UIButton button9Ball;
+    [SerializeField] public UIButton button10Ball;
     [SerializeField] public UIButton button4Ball;
     [SerializeField] public UIButton button4BallJP;
     [SerializeField] public UIButton button4BallKR;
@@ -26,6 +29,17 @@ public class MenuManager : UdonSharpBehaviour
     [SerializeField] public UIButton buttonTeamsToggle;
     [SerializeField] public UIButton buttonGuidelineToggle;
     [SerializeField] public UIButton buttonLockingToggle;
+    [SerializeField] public UIButton buttonPushOutToggle;
+    // [SerializeField] public UIButton buttonBreakingFoulToggle;
+    [SerializeField] public UIButton buttonBreakRuleToggle;
+    [SerializeField] public UIButton button4BallsInCushionToggle;
+    [SerializeField] public UIButton button3PointBreakToggle;
+    [SerializeField] public UIButton buttonRackSheet;
+    [SerializeField] public UIButton buttonWoodFrame;
+    [SerializeField] public UIButton buttonNoCushionFoulToggle;
+    [SerializeField] public UIButton buttonCallShotToggle;
+    [SerializeField] public UIButton buttonSemiAutoCallToggle;
+    [SerializeField] public UIButton buttonCallOverwriteModeToggle;
 
     [SerializeField] public UIButton buttonLeave;
     [SerializeField] public UIButton buttonPlay;
@@ -78,6 +92,7 @@ public class MenuManager : UdonSharpBehaviour
 
         button8Ball._ResetPushButton();
         button9Ball._ResetPushButton();
+        button10Ball._ResetPushButton();
         button4Ball._ResetPushButton();
         button4BallJP._ResetPushButton();
         button4BallKR._ResetPushButton();
@@ -105,6 +120,11 @@ public class MenuManager : UdonSharpBehaviour
                 button4BallKR._SetButtonPushed();
                 button4BallJP.gameObject.SetActive(true);
                 button4BallKR.gameObject.SetActive(true);
+                break;
+            case 4:
+                button10Ball._SetButtonPushed();
+                button4BallJP.gameObject.SetActive(false);
+                button4BallKR.gameObject.SetActive(false);
                 break;
         }
     }
@@ -164,6 +184,27 @@ public class MenuManager : UdonSharpBehaviour
             lobbyNames[i].text = table.graphicsManager._FormatName(table.playerNamesLocal[i]);
         }
 
+        for (int i = 0; i < 2; i++)
+        {
+            string teamName = i == 0 ? "[Orange]" : "[Blue]";
+            string name = table.playerNamesLocal[i];
+            if (name != "")
+            {
+                teamName = name;
+            }
+            if (table.teamsLocal)
+            {
+                name = table.playerNamesLocal[i + 2];
+                if (name != "")
+                {
+                    teamName += "\n" + name;
+                }
+            }
+#if TKCH_SCORE_SCREEN
+            table.scoreScreen.UpdateTeamName(i, teamName);
+#endif
+        }
+
         refreshJoinButtons();
     }
 
@@ -182,9 +223,47 @@ public class MenuManager : UdonSharpBehaviour
 
     public void _RefreshToggleSettings()
     {
+#if TKCH_DEBUG_TOGGLE
+        table._LogInfo("EIJIS_DEBUG MenuManager::_RefreshToggleSettings()");
+#endif
+        
         buttonTeamsToggle._SetButtonToggle(table.teamsLocal);
         buttonGuidelineToggle._SetButtonToggle(!table.noGuidelineLocal);
         buttonLockingToggle._SetButtonToggle(!table.noLockingLocal);
+        buttonPushOutToggle._SetButtonToggle(table.enablePushOutLocal);
+        buttonNoCushionFoulToggle._SetButtonToggle(table.noCushionFoulEnableLocal);
+
+        buttonRackSheet._ResetPushButton();
+        buttonWoodFrame._ResetPushButton();
+        if (table.rackConditionLocal == 0)
+        {
+            buttonRackSheet._SetButtonPushed();
+        }
+        else
+        {
+            buttonWoodFrame._SetButtonPushed();
+        }
+
+        // buttonBreakingFoulToggle._SetButtonToggle(table.breakTermsLocal != table.BREAK_TERMS_UNCONDITIONAL);
+        buttonBreakRuleToggle._SetButtonToggle(table.breakTermsLocal != table.BREAK_TERMS_UNCONDITIONAL);
+        button4BallsInCushionToggle.gameObject.SetActive(table.breakTermsLocal != table.BREAK_TERMS_UNCONDITIONAL);
+        button3PointBreakToggle.gameObject.SetActive(table.breakTermsLocal != table.BREAK_TERMS_UNCONDITIONAL);
+        button4BallsInCushionToggle._ResetPushButton();
+        button3PointBreakToggle._ResetPushButton();
+        if (table.breakTermsLocal == table.BREAK_TERMS_4_CUSHION)
+        {
+            button4BallsInCushionToggle._SetButtonPushed();
+        }
+        else if (table.breakTermsLocal == table.BREAK_TERMS_3_POINT)
+        {
+            button3PointBreakToggle._SetButtonPushed();
+        }
+
+        buttonCallShotToggle._SetButtonToggle(table.requireCallShotLocal);
+        buttonSemiAutoCallToggle.gameObject.SetActive(table.requireCallShotLocal);
+        buttonSemiAutoCallToggle._SetButtonToggle(table.requireCallShotLocal && table.semiAutoCallBallLocal && table.semiAutoCallPocketLocal);
+        buttonCallOverwriteModeToggle.gameObject.SetActive(table.requireCallShotLocal);
+        buttonCallOverwriteModeToggle._SetButtonToggle(table.requireCallShotLocal && table.callShotOprationOverwriteModeLocal);
 
         _RefreshPlayerList();
     }
@@ -194,6 +273,7 @@ public class MenuManager : UdonSharpBehaviour
         bool isNormalPlayer = table.localPlayerId != 0;
         button8Ball.disableInteractions = isNormalPlayer;
         button9Ball.disableInteractions = isNormalPlayer;
+        button10Ball.disableInteractions = isNormalPlayer;
         button4Ball.disableInteractions = isNormalPlayer;
         button4BallJP.disableInteractions = isNormalPlayer;
         button4BallKR.disableInteractions = isNormalPlayer;
@@ -202,6 +282,17 @@ public class MenuManager : UdonSharpBehaviour
         buttonLockingToggle.disableInteractions = isNormalPlayer;
         buttonTimerLeft.disableInteractions = isNormalPlayer;
         buttonTimerRight.disableInteractions = isNormalPlayer;
+        buttonPushOutToggle.disableInteractions = isNormalPlayer;
+        // buttonBreakingFoulToggle.disableInteractions = isNormalPlayer;
+        buttonBreakRuleToggle.disableInteractions = isNormalPlayer;
+        button4BallsInCushionToggle.disableInteractions = isNormalPlayer;
+        button3PointBreakToggle.disableInteractions = isNormalPlayer;
+        buttonRackSheet.disableInteractions = isNormalPlayer;
+        buttonWoodFrame.disableInteractions = isNormalPlayer;
+        buttonNoCushionFoulToggle.disableInteractions = isNormalPlayer;
+        buttonCallShotToggle.disableInteractions = isNormalPlayer;
+        buttonSemiAutoCallToggle.disableInteractions = isNormalPlayer;
+        buttonCallOverwriteModeToggle.disableInteractions = isNormalPlayer;
 
         refreshJoinButtons();
         _RefreshToggleSettings();
@@ -211,6 +302,9 @@ public class MenuManager : UdonSharpBehaviour
     public void _OnButtonPressed() { onButtonPressed(inButton); }
     private void onButtonPressed(UIButton button)
     {
+#if TKCH_DEBUG_TOGGLE
+        table._LogInfo($"EIJIS_DEBUG MenuManager::onButtonPressed( button = {button.name})");
+#endif
         if (button.name == "StartButton")
         {
             table._TriggerLobbyOpen();
@@ -258,6 +352,10 @@ public class MenuManager : UdonSharpBehaviour
             {
                 table._TriggerGameModeChanged(3);
             }
+            else if (button.name == "10Ball")
+            {
+                table._TriggerGameModeChanged(4);
+            }
             else if (button.name == "TeamsToggle")
             {
                 table._TriggerTeamsChanged(button.toggleState);
@@ -269,6 +367,56 @@ public class MenuManager : UdonSharpBehaviour
             else if (button.name == "LockingToggle")
             {
                 table._TriggerNoLockingChanged(!button.toggleState);
+            }
+            else if (button.name == "NoCushionFoulToggle")
+            {
+                table._TriggerNoCushionFoulChanged(button.toggleState);
+            }
+            else if (button.name == "PushOutToggle")
+            {
+                table._TriggerEnablePushOutChanged(button.toggleState);
+            }
+            // else if (button.name == "BreakingFoulToggle")
+            // {
+            //     table._TriggerBreakTermsChanged(button.toggleState ? table.BREAK_TERMS_4_CUSHION : table.BREAK_TERMS_UNCONDITIONAL);
+            // }
+            else if (button.name == "BreakRuleToggle")
+            {
+                table._TriggerBreakTermsChanged(button.toggleState ? table.BREAK_TERMS_4_CUSHION : table.BREAK_TERMS_UNCONDITIONAL);
+            }
+            else if (button.name == "4BallsInCushionToggle")
+            {
+                table._TriggerBreakTermsChanged(table.BREAK_TERMS_4_CUSHION);
+            }
+            else if (button.name == "3PointBreakToggle")
+            {
+                table._TriggerBreakTermsChanged(table.BREAK_TERMS_3_POINT);
+            }
+            else if (button.name == "RackSheetToggle")
+            {
+#if TKCH_DEBUG_TOGGLE
+                table._LogInfo($"  name = {button.name}, toggleState = {button.toggleState}");
+#endif
+                table._TriggerRackConditionChanged(0);
+            }
+            else if (button.name == "WoodFrameToggle")
+            {
+#if TKCH_DEBUG_TOGGLE
+                table._LogInfo($"  name = {button.name}, toggleState = {button.toggleState}");
+#endif
+                table._TriggerRackConditionChanged(1);
+            }
+            else if (button.name == "CallShotToggle")
+            {
+                table._TriggerRequireCallShotChanged(button.toggleState);
+            }
+            else if (button.name == "SemiAutoCallToggle")
+            {
+                table._TriggerSemiAutoCallChanged(button.toggleState);
+            }
+            else if (button.name == "CallOverwriteModeToggle")
+            {
+                table._TriggerCallOperationOverwriteModeChanged(button.toggleState);
             }
             else if (button.name == "TimeRight")
             {

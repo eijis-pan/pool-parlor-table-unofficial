@@ -1,4 +1,5 @@
-﻿
+﻿//#define TKCH_DEBUG_BREAKING_FOUL
+
 using UdonSharp;
 using UnityEngine;
 using UnityEngine.UI;
@@ -8,6 +9,23 @@ using VRC.Udon;
 [UdonBehaviourSyncMode(BehaviourSyncMode.NoVariableSync)]
 public class GraphicsManager : UdonSharpBehaviour
 {
+    [Header("Pocket Billiard Additional")]
+    [SerializeField] GameObject[] cushionTouch;
+    [SerializeField] Material calledPocketBlue;
+    [SerializeField] Material calledPocketOrange;
+    [SerializeField] Material calledPocketWhite;
+    [SerializeField] Material calledPocketYellow;
+    [SerializeField] Material calledPocketSphereBlue;
+    [SerializeField] Material calledPocketSphereOrange;
+    [SerializeField] Material calledPocketSphereWhite;
+    [SerializeField] Material calledPocketSphereYellow;
+    [SerializeField] Material calleShotLockBlue;
+    [SerializeField] Material calleShotLockOrange;
+    [SerializeField] Material calleShotLockWhite;
+    [SerializeField] Material calleShotLockYellow;
+    [SerializeField] Material pushOutDont;
+    [SerializeField] Material pushOutDoing;
+
     [Header("4 Ball")]
     [SerializeField] GameObject fourBallPoint;
     [SerializeField] Mesh fourBallMeshPlus;
@@ -48,6 +66,9 @@ public class GraphicsManager : UdonSharpBehaviour
 
     private bool fourBallPointActive;
     private float fourBallPointTime;
+
+    private bool[] cushionTouchActive;
+    private float[] cushionTouchTime;
 
     private float introAnimationTime = 0.0f;
 
@@ -106,6 +127,14 @@ public class GraphicsManager : UdonSharpBehaviour
             meshOverrideRegular[i + 1] = balls[13 + i].GetComponent<MeshFilter>().sharedMesh;
         }
 
+        cushionTouchActive = new bool[cushionTouch.Length];
+        cushionTouchTime = new float[cushionTouch.Length];
+        for (int i = 0; i < cushionTouch.Length; i++)
+        {
+            cushionTouchActive[i] = false;
+            cushionTouchTime[i] = 0;
+        }
+
         _DisableObjects();
     }
 
@@ -123,6 +152,7 @@ public class GraphicsManager : UdonSharpBehaviour
     {
         tickBallPositions();
         tickFourBallPoint();
+        tickCushionTouch();
         tickIntroAnimation();
         tickTableColor();
         tickLobbyStatus();
@@ -175,6 +205,41 @@ public class GraphicsManager : UdonSharpBehaviour
         {
             fourBallPointActive = false;
             fourBallPoint.SetActive(false);
+        }
+    }
+
+    private void tickCushionTouch()
+    {
+        for (int i = 0; i < cushionTouch.Length; i++)
+        {
+            if (!cushionTouchActive[i]) continue;
+
+            // Evaluate time
+            cushionTouchTime[i] += Time.deltaTime * 0.25f;
+
+            // Sustained step
+            float s = Mathf.Max(cushionTouchTime[i] - 0.1f, 0.0f);
+            float v = Mathf.Min(cushionTouchTime[i] * cushionTouchTime[i] * 100.0f, 21.0f * s * Mathf.Exp(-15.0f * s));
+
+            // Exponential step
+            float e = Mathf.Exp(-17.0f * Mathf.Pow(Mathf.Max(cushionTouchTime[i] - 1.2f, 0.0f), 3.0f));
+
+            float scale = e * v * 2.0f;
+
+            // Set scale
+            cushionTouch[i].transform.localScale = new Vector3(scale, scale, scale);
+
+            // Set position
+            Vector3 temp = cushionTouch[i].transform.localPosition;
+            temp.y = cushionTouchTime[i] * 0.5f;
+            cushionTouch[i].transform.localPosition = temp;
+
+            // Particle death
+            if (cushionTouchTime[i] > 2.0f)
+            {
+                cushionTouchActive[i] = false;
+                cushionTouch[i].SetActive(false);
+            }
         }
     }
 
@@ -412,6 +477,19 @@ public class GraphicsManager : UdonSharpBehaviour
         fourBallPoint.transform.LookAt(Networking.LocalPlayer.GetPosition());
     }
 
+    public void _SpawnCushionTouch(Vector3 pos, int color)
+    {
+        if (color < 0 || cushionTouch.Length <= color) return;
+        
+        cushionTouch[color].SetActive(true);
+        cushionTouchActive[color] = true;
+        cushionTouchTime[color] = 0.1f;
+
+        cushionTouch[color].transform.localPosition = pos;
+        cushionTouch[color].transform.localScale = Vector3.zero;
+        cushionTouch[color].transform.LookAt(Networking.LocalPlayer.GetPosition());
+    }
+
     public void _FlashTableLight()
     {
         tableCurrentColour *= 1.9f;
@@ -517,8 +595,9 @@ int uniform_cue_colour;
     private void updateCues(uint idsrc)
     {
         if (table.is4Ball) updateFourBallCues();
-        else if (table.is9Ball) updateNineBallCues();
-        else if (table.is8Ball) updateEightBallCues(idsrc);
+        // else if (table.is9Ball) updateNineBallCues();
+        // else if (table.is8Ball) updateEightBallCues(idsrc);
+        else updateEightBallCues(idsrc);
 
         if (table.isPracticeMode)
         {
@@ -546,6 +625,9 @@ int uniform_cue_colour;
 
     private void updateTable(uint teamId)
     {
+#if TKCH_DEBUG_BREAKING_FOUL
+        table._LogInfo($"TKCH GraphicsManager::updateTable(teamId = {teamId})");
+#endif
         if (table.is4Ball)
         {
             if ((teamId ^ table.teamColorLocal) == 0)
@@ -559,21 +641,27 @@ int uniform_cue_colour;
                 tableSrcColour = pColour1;
             }
         }
-        else if (table.is9Ball)
-        {
-            tableSrcColour = pColour2;
-        }
+        // else if (table.is9Ball)
+        // {
+        //     tableSrcColour = pColour2;
+        // }
         else
         {
             if (!table.isTableOpenLocal)
             {
                 if ((teamId ^ table.teamColorLocal) == 0)
                 {
+#if TKCH_DEBUG_BREAKING_FOUL
+                    table._LogInfo($"  Set table colour to blue");
+#endif
                     // Set table colour to blue
                     tableSrcColour = pColour0;
                 }
                 else
                 {
+#if TKCH_DEBUG_BREAKING_FOUL
+                    table._LogInfo($"  Set table colour to orange");
+#endif
                     // Table colour to orange
                     tableSrcColour = pColour1;
                 }
@@ -587,6 +675,9 @@ int uniform_cue_colour;
     
     public void _UpdateTeamColor(uint teamId)
     {
+#if TKCH_DEBUG_BREAKING_FOUL
+        table._LogInfo($"TKCH GraphicsManager::_UpdateTeamColor(teamId = {teamId})");
+#endif
         updateCues(teamId);
         updateTable(teamId);
     }
@@ -630,6 +721,14 @@ int uniform_cue_colour;
             for (int i = 10; i < 16; i++)
                 table.balls[i].SetActive(false);
         }
+        else if (table.is10Ball)
+        {
+            for (int i = 0; i <= 10; i++)
+                table.balls[i].SetActive(true);
+
+            for (int i = 11; i < 16; i++)
+                table.balls[i].SetActive(false);
+        }
         else if (table.is4Ball)
         {
             for (int i = 1; i < 16; i++)
@@ -663,12 +762,17 @@ int uniform_cue_colour;
 
     public void _OnGameStarted()
     {
-        scorecard.SetInt("_GameMode", (int)table.gameModeLocal);
+#if TKCH_DEBUG_BREAKING_FOUL
+        table._LogInfo("TKCH GraphicsManager::_OnGameStarted()");
+        table._LogInfo($"  teamId = {table.teamIdLocal}");
+#endif
+
+        scorecard.SetInt("_GameMode", (int)(table.is10Ball ? 1 : table.gameModeLocal));
         scorecard.SetInt("_SolidsMode", 0);
         tableMaterial.SetFloat("_TimerPct", 0);
 
         _UpdateTableColorScheme();
-        _UpdateTeamColor(0);
+        _UpdateTeamColor(table.teamIdLocal);
 
         lobbyStatusTextHolder.SetActive(false);
 
@@ -690,6 +794,19 @@ int uniform_cue_colour;
 
     public void _UpdateTableColorScheme()
     {
+        if (table.is9Ball || table.is10Ball)
+        {
+            pColourErr = table.k_colour_foul;
+            pColour2 = table.k_colour_default;
+
+            pColour0 = table.k_teamColour_spots;
+            pColour1 = table.k_teamColour_stripes;
+            
+            pClothColour = table.k_fabricColour_9ball;
+
+            ballMaterial.SetTexture("_MainTex", usColorTexture);
+        }
+        /*
         if (table.is9Ball)  // 9 Ball / USA colours
         {
             pColour0 = table.k_colour_default;
@@ -702,6 +819,7 @@ int uniform_cue_colour;
             // 9 ball only uses one colourset / cloth colour
             ballMaterial.SetTexture("_MainTex", table.textureSets[1]);
         }
+        */
         else if (table.is4Ball)
         {
             pColour0 = table.k_colour4Ball_team_0;
@@ -746,7 +864,12 @@ int uniform_cue_colour;
         table.markerObj.SetActive(false);
         scorecardHolder.SetActive(false);
         table.marker9ball.SetActive(false);
+        table.markerCalledBall.SetActive(false);
         fourBallPoint.SetActive(false);
+        for (int i = 0; i < cushionTouch.Length; i++)
+        {
+            cushionTouch[i].SetActive(false);
+        }
         table.transform.Find("intl.controls/undo").gameObject.SetActive(false);
         table.transform.Find("intl.controls/redo").gameObject.SetActive(false);
         table.transform.Find("intl.controls/skipturn").gameObject.SetActive(false);
@@ -864,6 +987,45 @@ int uniform_cue_colour;
             table.balls[13].GetComponent<MeshFilter>().sharedMesh = meshOverrideFourBall[0];
             table.balls[0].GetComponent<MeshFilter>().sharedMesh = meshOverrideFourBall[1];
         }
+    }
+
+    public void _UpdatePointPocketMarker(uint pointPockets, bool callShotLock)
+    {
+        for (int i = 0; i < table.pointPocketMarkers.Length; i++)
+        {
+            bool enable = (pointPockets & (0x1u << i)) != 0;
+            if (enable)
+            {
+                table.pointPocketMarkers[i].GetComponent<MeshRenderer>().material =
+                    (callShotLock ? calledPocketYellow :
+                        (table.isTableOpenLocal ? calledPocketWhite :
+                            (table.teamIdLocal ^ table.teamColorLocal) == 0 ? calledPocketBlue : calledPocketOrange));
+                table.pointPocketMarkerSphere[i].GetComponent<MeshRenderer>().material =
+                    (callShotLock ? calledPocketSphereYellow :
+                        (table.isTableOpenLocal ? calledPocketSphereWhite :
+                            (table.teamIdLocal ^ table.teamColorLocal) == 0 ? calledPocketSphereBlue : calledPocketSphereOrange));
+            }
+            table.pointPocketMarkers[i].SetActive(enable);
+        }
+
+        table.transform.Find("intl.controls/callShotLock/render").GetComponent<MeshRenderer>().material =
+            (callShotLock ? calleShotLockYellow :
+                (table.isTableOpenLocal ? calleShotLockWhite :
+                    (table.teamIdLocal ^ table.teamColorLocal) == 0 ? calleShotLockBlue : calleShotLockOrange));
+    }
+
+    public void _DisablePointPocketMarker()
+    {
+        for (int i = 0; i < table.pointPocketMarkers.Length; i++)
+        {
+            table.pointPocketMarkers[i].SetActive(false);
+        }
+    }
+
+    public void _UpdatePushOut(byte pushOutState)
+    {
+        table.transform.Find("intl.controls/pushOut/render").GetComponent<MeshRenderer>().material =
+            (pushOutState == table.PUSHOUT_DOING ? pushOutDoing : pushOutDont);
     }
 
     public bool _IsUsingTableTimer()
