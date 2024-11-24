@@ -1,4 +1,5 @@
-﻿
+﻿//#define TKCH_DEBUG_CAMERA
+
 using Metaphira.Modules.CameraOverride;
 using UdonSharp;
 using UnityEngine;
@@ -334,12 +335,18 @@ public class DesktopManager : UdonSharpBehaviour
 
     private void enterUI()
     {
+#if TKCH_DEBUG_CAMERA
+        table._LogInfo("TKCH DesktopManager::enterUI()");
+#endif
         inUI = true;
         repositionMode = false;
         root.SetActive(true);
         Networking.LocalPlayer.Immobilize(true);
 
         Camera desktopCamera = root.GetComponentInChildren<Camera>();
+#if TKCH_DEBUG_CAMERA
+        table._LogInfo($"  desktopCamera {(ReferenceEquals(desktopCamera, null) ? "null" : desktopCamera.name)}");
+#endif
         table.cameraOverrideModule.shouldMaintainAspectRatio = true;
         table.cameraOverrideModule.aspectRatio = new Vector2(1920, 1080);
         table.cameraOverrideModule._SetTargetCamera(desktopCamera);

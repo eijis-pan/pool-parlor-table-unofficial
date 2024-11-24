@@ -17,6 +17,7 @@
 //#define TKCH_DEBUG_UNDO
 //#define TKCH_DEBUG_TIMEOUT
 //#define TKCH_DEBUG_REPOSITION_PICKUP
+//#define TKCH_DEBUG_CAMERA
 
 using UdonSharp;
 using UnityEngine;
@@ -25,6 +26,7 @@ using VRC.SDKBase;
 using VRC.Udon;
 using System;
 using System.Runtime.Remoting.Messaging;
+using Cysharp.Threading.Tasks.Triggers;
 using Metaphira.Modules.CameraOverride;
 
 [UdonBehaviourSyncMode(BehaviourSyncMode.NoVariableSync)]
@@ -283,10 +285,19 @@ public class BilliardsModule : UdonSharpBehaviour
 
     private void OnEnable()
     {
+#if TKCH_ONEPOCKET_SCORE
+        scoreScreen.Init();
+#if TKCH_DEBUG_SCORE
+        _LogInfo($"  EmptyTextOnZero");
+#endif
+        scoreScreen.SetTeamSafeNoPocketShotCountEmptyTextOnZero(0, true);
+        scoreScreen.SetTeamSafeNoPocketShotCountEmptyTextOnZero(1, true);
+#endif
 
         _LogInfo("initializing billiards module");
 
         cameraOverrideModule = (CameraOverrideModule)_GetModule(nameof(CameraOverrideModule));
+        cameraOverrideModule.init();
 
         initializeRack();
 
@@ -346,14 +357,6 @@ public class BilliardsModule : UdonSharpBehaviour
         pcketLocations[3] = new Vector3(-k_vE.x, k_vE.y, -k_vE.z);
         pcketLocations[4] = k_vF;
         pcketLocations[5] = new Vector3(k_vF.x, k_vF.y, -k_vF.z);;
-        
-#if TKCH_ONEPOCKET_SCORE
-#if TKCH_DEBUG_SCORE
-        _LogInfo($"  EmptyTextOnZero");
-#endif
-        scoreScreen.SetTeamSafeNoPocketShotCountEmptyTextOnZero(0, true);
-        scoreScreen.SetTeamSafeNoPocketShotCountEmptyTextOnZero(1, true);
-#endif
     }
 
     private void FixedUpdate()
@@ -818,10 +821,10 @@ public class BilliardsModule : UdonSharpBehaviour
             switch (physicsModeLocal)
             {
                 case 0:
-                    currentPhysicsManager = standardPhysicsManager;
+                    currentPhysicsManager = legacyPhysicsManager;
                     break;
                 case 1:
-                    currentPhysicsManager = legacyPhysicsManager;
+                    currentPhysicsManager = standardPhysicsManager;
                     break;
                 case 2:
                     currentPhysicsManager = betaPhysicsManager;
@@ -1602,7 +1605,7 @@ public class BilliardsModule : UdonSharpBehaviour
                 if (0 == id)
                 {
                     aud_main.PlayOneShot(snd_PointMade, 1.0f);
-                    graphicsManager._SpawnOnePocketPoint(pcketLocations[pocketId], false, -1);
+                    graphicsManager._SpawnOnePocketPoint((pocketId < 0 ? balls[id].transform.localPosition : pcketLocations[pocketId]), false, -1);
                 }
                 else
                 {
@@ -2173,12 +2176,12 @@ public class BilliardsModule : UdonSharpBehaviour
 
     public bool _IsLegacyPhysics()
     {
-        return physicsModeLocal == 1;
+        return physicsModeLocal == 0;
     }
 
     public bool _IsNewPhysics()
     {
-        return physicsModeLocal == 0;
+        return physicsModeLocal == 1;
     }
 
     public bool _IsBetaPhysics()
