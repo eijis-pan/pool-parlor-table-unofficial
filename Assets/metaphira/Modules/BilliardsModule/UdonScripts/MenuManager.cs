@@ -1,4 +1,5 @@
 ﻿#define TKCH_ONEPOCKET_SCORE
+//#define TKCH_TEAMS_OFF
 
 //#define TKCH_DEBUG_GAMEMODE
 //#define TKCH_DEBUG_POINT_POCKET_MARKER
@@ -65,6 +66,10 @@ public class MenuManager : UdonSharpBehaviour
         _RefreshToggleSettings();
         _RefreshGameMode();
         _RefreshLobbyOpen();
+        
+#if TKCH_TEAMS_OFF
+        buttonTeamsToggle.gameObject.SetActive(false);
+#endif
     }
 
     public void _Tick()

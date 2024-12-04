@@ -13,6 +13,8 @@
 #define TKCH_5BALL_HIDE8
 //#define TKCH_5BALL_PENTAGON
 #define TKCH_5BALL_3MODE_RUCK
+#define TKCH_CALLSHOT_CALLEDPBALL_DELAY
+#define TKCH_CALLSHOT_CALLEDPOCKET_DELAY
 
 //#define TKCH_DEBUG_ONEPOCKET
 //#define TKCH_DEBUG_POCKETED_RACK
@@ -288,6 +290,17 @@ public class BilliardsModule : UdonSharpBehaviour
     private bool delayCalledBallOff = false;
     private bool delayCalledPocketOff = false;
 #endif
+#if TKCH_CALLSHOT_CALLEDPBALL_DELAY || TKCH_CALLSHOT_CALLEDPOCKET_DELAY
+    private float callShotDelay = 0.4f;
+#endif
+#if TKCH_CALLSHOT_CALLEDPBALL_DELAY
+    private int calledBallId = -2;
+    private float calledBallIdDelayTimestamp = 0;
+#endif
+#if TKCH_CALLSHOT_CALLEDPOCKET_DELAY
+    private int calledPocketId = -2;
+    private float calledPocketIdDelayTimestamp = 0;
+#endif
 
     // physics simulation data, must be reset before every simulation
     [NonSerialized] public bool isLocalSimulationRunning;
@@ -359,6 +372,14 @@ public class BilliardsModule : UdonSharpBehaviour
 
     private void OnEnable()
     {
+#if TKCH_ONEPOCKET_SCORE
+        scoreScreen.Init();
+#if TKCH_DEBUG_SCORE
+        _LogInfo($"  EmptyTextOnZero");
+#endif
+        scoreScreen.SetTeamSafeNoPocketShotCountEmptyTextOnZero(0, true);
+        scoreScreen.SetTeamSafeNoPocketShotCountEmptyTextOnZero(1, true);
+#endif
 
         _LogInfo("initializing billiards module");
 
@@ -427,14 +448,6 @@ public class BilliardsModule : UdonSharpBehaviour
         pcketLocations[3] = new Vector3(-k_vE.x, k_vE.y, -k_vE.z);
         pcketLocations[4] = k_vF;
         pcketLocations[5] = new Vector3(k_vF.x, k_vF.y, -k_vF.z);;
-        
-#if TKCH_ONEPOCKET_SCORE
-#if TKCH_DEBUG_SCORE
-        _LogInfo($"  EmptyTextOnZero");
-#endif
-        scoreScreen.SetTeamSafeNoPocketShotCountEmptyTextOnZero(0, true);
-        scoreScreen.SetTeamSafeNoPocketShotCountEmptyTextOnZero(1, true);
-#endif
     }
 
     private void FixedUpdate()
@@ -595,7 +608,7 @@ public class BilliardsModule : UdonSharpBehaviour
         networkingManager._OnHitBall(ballsV[0], ballsW[0]);
     }
     
-    public void _TriggerOtherBallHit(int id, bool desktop)
+    public void _TriggerOtherBallHit(int ballId, bool desktop)
     {
 #if TKCH_DEBUG_CALLSHOT
         //_LogInfo($"TKCH BilliardsModule::_TriggerOtherBallHit(id = {id})");
@@ -614,7 +627,43 @@ public class BilliardsModule : UdonSharpBehaviour
             return;
         }
 #endif
+#if TKCH_CALLSHOT_CALLEDPBALL_DELAY
+        if (!desktop && calledBallId == ballId)
+        {
+            return;
+        }
+
+        if (!desktop && Time.time < calledBallIdDelayTimestamp + callShotDelay)
+        {
+            return;
+        }
+        else
+        {
+#if TKCH_DEBUG_CALLSHOT_DELAY
+            _LogInfo($"  calledBallId = {calledBallId}, calledBallIdDelayTimestamp = {calledBallIdDelayTimestamp}, callShotDelay = {callShotDelay}");
+#endif
+            calledBallIdDelayTimestamp = Time.time;
+            calledBallId = ballId;
+        }
+#endif
         
+#if TKCH_CALLSHOT_CALLEDPBALL_DELAY
+        int id = calledBallId;
+#else
+        int id = ballId;
+#endif
+
+#if TKCH_DEBUG_CALLSHOT_POCKETEDBALL
+        _LogInfo($"  id = {id}, ballsPocketedLocal = {ballsPocketedLocal:X4}, (0x1 << id) = {(0x1 << id):X4}");
+#endif
+        if (0 < id && 0 != (ballsPocketedLocal & (0x1 << id)))
+        {
+#if TKCH_DEBUG_CALLSHOT_POCKETEDBALL
+            _LogInfo("  return");
+#endif
+            return;
+        }
+
         if (id < 0)
         {
 #if TKCH_BANKPOOL_CALLEDPBALLOFF_DELAY
@@ -643,6 +692,8 @@ public class BilliardsModule : UdonSharpBehaviour
             return;
         }
 
+        if (Networking.LocalPlayer == null || Networking.GetOwner(activeCue.gameObject) != Networking.LocalPlayer) return;
+
         bool enable = (calledBallsLocal < calledBalls);
 
 #if TKCH_DEBUG_CALLSHOT
@@ -656,7 +707,7 @@ public class BilliardsModule : UdonSharpBehaviour
         //aud_main.PlayOneShot(snd_btn);
     }
 
-    public void _TriggerPocketHit(int id, bool desktop)
+    public void _TriggerPocketHit(int pocketId, bool desktop)
     {
 #if TKCH_DEBUG_CALLSHOT
         //_LogInfo($"TKCH BilliardsModule::_TriggerPocketHit(id = {id})");
@@ -674,6 +725,32 @@ public class BilliardsModule : UdonSharpBehaviour
         {
             return;
         }
+#endif
+
+#if TKCH_CALLSHOT_CALLEDPOCKET_DELAY
+        if (!desktop && calledPocketId == pocketId)
+        {
+            return;
+        }
+
+        if (!desktop && Time.time < calledPocketIdDelayTimestamp + callShotDelay)
+        {
+            return;
+        }
+        else
+        {
+#if TKCH_DEBUG_CALLSHOT_DELAY
+            _LogInfo($"  calledPocketId = {calledPocketId}, calledPocketIdDelayTimestamp = {calledPocketIdDelayTimestamp}, callShotDelay = {callShotDelay}");
+#endif
+            calledPocketIdDelayTimestamp = Time.time;
+            calledPocketId = pocketId;
+        }
+#endif
+
+#if TKCH_CALLSHOT_CALLEDPOCKET_DELAY
+        int id = calledPocketId;
+#else
+        int id = pocketId;
 #endif
 
         if (id < 0)
@@ -703,6 +780,8 @@ public class BilliardsModule : UdonSharpBehaviour
         {
             return;
         }
+
+        if (Networking.LocalPlayer == null || Networking.GetOwner(activeCue.gameObject) != Networking.LocalPlayer) return;
 
         bool enable = (pointPocketsLocal < pointPockets);
 
@@ -1062,10 +1141,10 @@ public class BilliardsModule : UdonSharpBehaviour
             switch (physicsModeLocal)
             {
                 case 0:
-                    currentPhysicsManager = standardPhysicsManager;
+                    currentPhysicsManager = legacyPhysicsManager;
                     break;
                 case 1:
-                    currentPhysicsManager = legacyPhysicsManager;
+                    currentPhysicsManager = standardPhysicsManager;
                     break;
                 case 2:
                     currentPhysicsManager = betaPhysicsManager;
@@ -2696,12 +2775,12 @@ public class BilliardsModule : UdonSharpBehaviour
 
     public bool _IsLegacyPhysics()
     {
-        return physicsModeLocal == 1;
+        return physicsModeLocal == 0;
     }
 
     public bool _IsNewPhysics()
     {
-        return physicsModeLocal == 0;
+        return physicsModeLocal == 1;
     }
 
     public bool _IsBetaPhysics()
