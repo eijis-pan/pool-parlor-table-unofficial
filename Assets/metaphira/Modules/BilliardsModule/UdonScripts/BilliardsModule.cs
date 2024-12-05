@@ -305,6 +305,7 @@ public class BilliardsModule : UdonSharpBehaviour
 
     private void OnEnable()
     {
+        scoreScreen.Init();
         scoreScreen.SetPointSigned(false);
         logLabel = string.IsNullOrEmpty(logLabel) ? string.Empty : " " + logLabel;
 
