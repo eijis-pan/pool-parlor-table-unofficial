@@ -13,8 +13,8 @@ using VRC.Udon;
 public class BilliardsScoreScreen : UdonSharpBehaviour
 {
     [SerializeField] private PlayerRow headerRow;
-    [SerializeField] private TeamPlayers highGroup;
-    [SerializeField] private TeamPlayers lowGroup;
+    [SerializeField] private TeamPlayers highGroup; // Orange
+    [SerializeField] private TeamPlayers lowGroup; // Blue
     [SerializeField] private BilliardsModule table;
     
     private TeamPlayers[] teamPlayers = new TeamPlayers[2];
@@ -259,8 +259,14 @@ public class BilliardsScoreScreen : UdonSharpBehaviour
         teamPlayers = new[] { highGroup, lowGroup };
         foreach (var group in teamPlayers)
         {
-            group.Table = table;
+            if (ReferenceEquals(null, group))
+            {
+                continue;
+            }
+            
             group.Init();
+            group.Table = table;
+            // group.Init();
         }
         //UpdateLeftBallCount(0);
         
@@ -274,6 +280,11 @@ public class BilliardsScoreScreen : UdonSharpBehaviour
         int scoreSyncRowsIndex = 0;
         for (int i = 0; i < teamPlayers.Length; i++)
         {
+            if (ReferenceEquals(null, teamPlayers[i]))
+            {
+                continue;
+            }
+            
             scoreSyncRows[scoreSyncRowsIndex++] = teamPlayers[i].GetTeamRow();
             for (int j = 0; j < 4; j++)
             {
@@ -388,6 +399,16 @@ public class BilliardsScoreScreen : UdonSharpBehaviour
         return scoreSyncRows[0].EncodeScoreParams_Mini(point, shotCount, scratchCount, safeNoPocketShotCount);
     }
 
+    public uint EncodeScoreParams_Frame5(int totalPoint, int[] scores)
+    {
+        if (scoreSyncRows.Length <= 0)
+        {
+            return 0xDEADBEAFu;
+        }
+
+        return scoreSyncRows[0].EncodeScoreParams_Frame5(totalPoint, scores);
+    }
+
     public void DecodeScoreSyncValues(uint[] scoreSyncValues)
     {
 #if TKCH_DEBUG_SCORE
@@ -420,6 +441,109 @@ public class BilliardsScoreScreen : UdonSharpBehaviour
             j++;
         }
     }
+
+    public void DecodeScoreSyncValues_Frame5(uint[] scoreSyncValues)
+    {
+#if TKCH_DEBUG_SCORE
+        table._Log($"TKCH BilliardsScoreScreen::DecodeScoreSyncValues_Frame5( scoreSyncValues.Length = {scoreSyncValues.Length} )");
+        // table._Log($"TKCH  vsTeamZeroSumMode = {vsTeamZeroSumMode}");
+        table._Log($"TKCH  scoreSyncRows.Length {scoreSyncRows.Length}");
+#endif
+        /*
+        if (vsTeamZeroSumMode)
+        {
+            int[][] scoreMatrix = new[] { new int[6], new int[6], new int[6], new int[6] };
+            
+            for (int i = 0, j = 0; i < scoreSyncRows.Length; i++)
+            {
+                if (scoreSyncValues.Length <= j)
+                {
+                    continue;
+                }
+                if (ReferenceEquals(null, scoreSyncRows[i]))
+                {
+                    continue;
+                }
+                int[] decodedSyncValues = scoreSyncRows[i].DecodedSyncValues_Frame5(scoreSyncValues[j]);
+#if TKCH_DEBUG_SCORE
+                table._Log($"TKCH  decodedSyncValues.Length {decodedSyncValues.Length}");
+#endif
+                Array.Copy(decodedSyncValues, scoreMatrix[j], scoreMatrix[j].Length);
+                j++;
+            }
+
+            int activeTeamCount = 0;
+            for (int i = 0; i < teamPlayers.Length; i++)
+            {
+                if (ReferenceEquals(null, teamPlayers[i]) || 
+                    teamPlayers[i].GetTeamRow().GetName() == "")
+                {
+                    break;
+                }
+            
+                activeTeamCount++;
+            }
+#if TKCH_DEBUG_SCORE
+            table._Log($"TKCH  activeTeamCount {activeTeamCount}");
+#endif
+            
+            for (int i = 0; i < 6; i++)
+            {
+                int[] subTotals = new int[activeTeamCount];
+                
+                for (int j = 0; j < activeTeamCount; j++)
+                {
+                    subTotals[j] = scoreMatrix[j][i] * (activeTeamCount - 1);
+                    for (int k = 0; k < activeTeamCount; k++)
+                    {
+                        if (j == k)
+                        {
+                            continue;
+                        }
+                        
+                        subTotals[j] -= scoreMatrix[k][i];
+                    }
+                }
+                
+                for (int j = 0; j < activeTeamCount; j++)
+                {
+                    scoreMatrix[j][i] = subTotals[j];
+                }
+            }
+
+            for (int i = 0, j = 0; i < scoreSyncRows.Length; i++)
+            {
+                if (ReferenceEquals(null, scoreSyncRows[i]))
+                {
+                    continue;
+                }
+                scoreSyncRows[i].SetScoreByArray(scoreMatrix[j]);
+                j++;
+            }
+        }
+        else
+        */
+        {
+#if TKCH_DEBUG_SCORE
+            table._Log($"TKCH  scoreSyncRows is null ? {ReferenceEquals(null, scoreSyncRows)}");
+            table._Log($"TKCH  scoreSyncRows.Length = {scoreSyncRows.Length}");
+#endif
+            for (int i = 0, j = 0; i < scoreSyncRows.Length; i++)
+            {
+                if (ReferenceEquals(null, scoreSyncRows[i]))
+                {
+                    continue;
+                }
+                scoreSyncRows[i].DecodeSyncValue_Frame5(scoreSyncValues[j]);
+                j++;
+            }
+        }
+        
+        // if (!ReferenceEquals(null, cascadeScoreScreen))
+        // {
+        //     cascadeScoreScreen.DecodeScoreSyncValues_Frame5(scoreSyncValues);
+        // }
+    }
 #endif
 
     /*
@@ -445,6 +569,11 @@ public class BilliardsScoreScreen : UdonSharpBehaviour
 #endif
         foreach (var group in teamPlayers)
         {
+            if (ReferenceEquals(null, group))
+            {
+                continue;
+            }
+
             group.Clear();
         }
     }
@@ -509,6 +638,21 @@ public class BilliardsScoreScreen : UdonSharpBehaviour
     public void UpdateGameNameWithNumber(string ganeName, int number)
     {
         headerRow.SetName($"{ganeName} [{number}]");
+        
+        // if (!ReferenceEquals(null, cascadeScoreScreen))
+        // {
+        //     cascadeScoreScreen.UpdateGameNameWithNumber(ganeName, number);
+        // }
+    }
+
+    public void UpdateHeaderTextByColIndex(string text, int colIndex)
+    {
+        headerRow.SetTextByColIndex(text, colIndex);
+        
+        // if (!ReferenceEquals(null, cascadeScoreScreen))
+        // {
+        //     cascadeScoreScreen.UpdateHeaderTextByColIndex(text, colIndex);
+        // }
     }
 
     public void UpdateTeamName(int teamIndex, string teamName)
@@ -520,6 +664,11 @@ public class BilliardsScoreScreen : UdonSharpBehaviour
         table._Log($"  ReferenceEquals(null, teamPlayers[{teamIndex}].GetTeamRow()) => {ReferenceEquals(null, teamPlayers[teamIndex].GetTeamRow())}");
 #endif
         teamPlayers[teamIndex].GetTeamRow().SetName(teamName);
+        
+        // if (!ReferenceEquals(null, cascadeScoreScreen))
+        // {
+        //     cascadeScoreScreen.UpdateTeamName(teamIndex, teamName);
+        // }
     }
 
     public void UpdatePlayer(int playerId, string playerName)
@@ -553,16 +702,40 @@ public class BilliardsScoreScreen : UdonSharpBehaviour
 
     public int WinnerTeamId()
     {
-        if (highGroup.GetTeamPoint() > lowGroup.GetTeamPoint())
+        // if (highGroup.GetTeamPoint() > lowGroup.GetTeamPoint())
+        // {
+        //     return 0;
+        // }
+        // else if (highGroup.GetTeamPoint() < lowGroup.GetTeamPoint())
+        // {
+        //     return 1;
+        // }
+        //
+        // return -1;
+
+        int winnerTeamId = -1;
+        int maxPoint = Int32.MinValue;
+        
+        for (int i = 0; i < teamPlayers.Length; i++)
         {
-            return 0;
-        }
-        else if (highGroup.GetTeamPoint() < lowGroup.GetTeamPoint())
-        {
-            return 1;
+            if (ReferenceEquals(null, teamPlayers[i]))
+            {
+                continue;
+            }
+
+            int teamPoint = teamPlayers[i].GetTeamPoint();
+            if (maxPoint < teamPoint)
+            {
+                winnerTeamId = i;
+                maxPoint = teamPoint;
+            }
+            else if (maxPoint == teamPoint)
+            {
+                return -1;
+            }
         }
 
-        return -1;
+        return winnerTeamId;
     }
     
     public int GetTeamPoint(int teamIndex)
@@ -570,11 +743,6 @@ public class BilliardsScoreScreen : UdonSharpBehaviour
         return teamPlayers[teamIndex].GetTeamPoint();
     }
 
-    public int GetTeamScratchCount(int teamIndex)
-    {
-        return teamPlayers[teamIndex].GetTeamScratchCount();
-    }
-    
     public int GetTeamPocketBallCount(int teamIndex)
     {
         return teamPlayers[teamIndex].GetTeamPocketBallCount();
@@ -590,9 +758,24 @@ public class BilliardsScoreScreen : UdonSharpBehaviour
         return teamPlayers[teamIndex].GetTeamSafeNoPocketShotCount();
     }
     
+    public int GetTeamScratchCount(int teamIndex)
+    {
+        return teamPlayers[teamIndex].GetTeamScratchCount();
+    }
+    
     public int GetTeamInvalidPocketBallCount(int teamIndex)
     {
         return teamPlayers[teamIndex].GetTeamInvalidPocketBallCount();
+    }
+
+    public int[] GetTeamScores(int teamIndex)
+    {
+        return teamPlayers[teamIndex].GetTeamRow().GetScores();
+    }
+
+    public int GetTeamScoreByColIndex(int teamIndex, int colIndex)
+    {
+        return teamPlayers[teamIndex].GetTeamRow().GetScoreByColIndex(colIndex);
     }
 
     public void SetTeamSafeNoPocketShotCountEmptyTextOnZero(int teamIndex, bool emptyTextOnZero)

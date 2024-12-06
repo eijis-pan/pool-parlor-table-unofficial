@@ -45,8 +45,14 @@ public class TeamPlayers : UdonSharpBehaviour
     private void Start()
     {
 #if TKCH_DEBUG_SCORE
-        //table._Log($"TKCH TeamPlayers::Start() [{GetInstanceID()}]");
-        Debug.Log($"TKCH TeamPlayers::Start() [{GetInstanceID()}]");
+        if (ReferenceEquals(null, table))
+        {
+            Debug.Log($"TKCH TeamPlayers::Start() [{GetInstanceID()}] table is null ? {ReferenceEquals(null, table)}");
+        }
+        else
+        {
+            table._Log($"TKCH TeamPlayers::Start() [{GetInstanceID()}] table is null ? {ReferenceEquals(null, table)}");
+        }
 #endif
         allRows = new[] { teamRow, playerRow1, playerRow2, playerRow3, playerRow4 };
         playerRows = new[] { playerRow1, playerRow2, playerRow3, playerRow4 };
@@ -55,8 +61,14 @@ public class TeamPlayers : UdonSharpBehaviour
     public void Init()
     {
 #if TKCH_DEBUG_SCORE
-        //table._Log($"TKCH TeamPlayers::Init() [{GetInstanceID()}]");
-        Debug.Log($"TKCH TeamPlayers::Init() [{GetInstanceID()}]");
+        if (ReferenceEquals(null, table))
+        {
+            Debug.Log($"TKCH TeamPlayers::Init() [{GetInstanceID()}] table is null ? {ReferenceEquals(null, table)}");
+        }
+        else
+        {
+            table._Log($"TKCH TeamPlayers::Init() [{GetInstanceID()}] table is null ? {ReferenceEquals(null, table)}");
+        }
 #endif
         allRows = new[] { teamRow, playerRow1, playerRow2, playerRow3, playerRow4 };
         playerRows = new[] { playerRow1, playerRow2, playerRow3, playerRow4 };
@@ -67,16 +79,17 @@ public class TeamPlayers : UdonSharpBehaviour
             {
                 continue;
             }
-            playerRow.Clear();
+            playerRow.Init();
+            playerRow.Clear(false);
         }
 
         teamRow.SetName("[Team]");
-        teamRow.Init();
+        teamRow.Clear(true);
     }
 
     public void Clear()
     {
-        teamRow.Init();
+        teamRow.Clear(true);
         foreach (var playerRow in playerRows)
         {
             if (ReferenceEquals(null, playerRow))
@@ -86,14 +99,14 @@ public class TeamPlayers : UdonSharpBehaviour
 #if true //TKCH_SYNC_SCORE
             if (string.Empty == playerRow.GetName())
             {
-                playerRow.Clear();
+                playerRow.Clear(false);
             }
             else
             {
-                playerRow.Init();
+                playerRow.Clear(true);
             }
 #else
-            playerRow.Init();
+            playerRow.Clear(true);
 #endif
         }
     }

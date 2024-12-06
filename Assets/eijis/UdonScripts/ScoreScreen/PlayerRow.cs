@@ -49,6 +49,7 @@ public class PlayerRow : UdonSharpBehaviour
             Debug.Log($"TKCH PlayerRow::Table set [{GetInstanceID()}]");
 #endif
             table = value;
+            Init();
         }
     }
     
@@ -180,10 +181,104 @@ public class PlayerRow : UdonSharpBehaviour
 
         UpdateText();
     }
+    
+    public void DecodeSyncValue_Frame5(uint value)
+    {
+        int shotCount = (int)((value >> 27) & 0x1Fu);
+        int safeNoPocketShotCount = (int)((value >> 22) & 0x1Fu);
+        int scratchCount = (int)((value >> 17) & 0x1Fu);
+        int pocketBallCount = (int)((value >> 12) & 0x1Fu);
+        int invalidPocketBallCount = (int)((value >> 7) & 0x1Fu);
+        int point = (int)((value >> 0) & 0x7Fu);
+        if (scoreSigned[Array.IndexOf(scoreTexts, pointText)])
+        {
+            uint u = (value >> 0) & 0x3Fu;
+            if (0 < ((value >> 0) & 0x40u))
+            {
+                u |= 0xFFFFFFC0u;
+                u = ~u;
+                point = 0 - ((int)u + 1);
+            }
+            else
+            {
+                point = (int)u;
+            }
+        }
+
+#if TKCH_DEBUG_SCORE
+        table._Log($"TKCH PlayerRow::DecodeSyncValue_Frame5 [{GetInstanceID()}] point => {point}, shotCount => {shotCount}, safeNoPocketShotCount => {safeNoPocketShotCount}, scratchCount => {scratchCount}, pocketBallCount => {pocketBallCount}, invalidPocketBallCount => {invalidPocketBallCount}");
 #endif
 
-    private void Start()
+        if (0 <= Array.IndexOf(scoreTexts, pointText)) scores[Array.IndexOf(scoreTexts, pointText)] = point; // - 127;
+        if (0 <= Array.IndexOf(scoreTexts, shotCountText)) scores[Array.IndexOf(scoreTexts, shotCountText)] = shotCount;
+        if (0 <= Array.IndexOf(scoreTexts, safeNoPocketShotCountText)) scores[Array.IndexOf(scoreTexts, safeNoPocketShotCountText)] = safeNoPocketShotCount;
+        if (0 <= Array.IndexOf(scoreTexts, scratchCountText)) scores[Array.IndexOf(scoreTexts, scratchCountText)] = scratchCount;
+        if (0 <= Array.IndexOf(scoreTexts, pocketBallCountText)) scores[Array.IndexOf(scoreTexts, pocketBallCountText)] = pocketBallCount;
+        if (0 <= Array.IndexOf(scoreTexts, invalidPocketBallCountText)) scores[Array.IndexOf(scoreTexts, invalidPocketBallCountText)] = invalidPocketBallCount;
+
+        UpdateText();
+    }
+
+    public int[] DecodedSyncValues_Frame5(uint value)
     {
+#if TKCH_DEBUG_SCORE
+        if (ReferenceEquals(null, table))
+        {
+            Debug.Log($"TKCH PlayerRow::DecodedSyncValues_Frame5() [{GetInstanceID()}] table is null ? {ReferenceEquals(null, table)}");
+            Debug.Log($"TKCH  scoreSigned is null ? {ReferenceEquals(null, scoreSigned)}");
+            Debug.Log($"TKCH  scoreSigned.Length = {scoreSigned.Length}");
+            Debug.Log($"TKCH  scoreTexts is null ? {ReferenceEquals(null, scoreTexts)}");
+            Debug.Log($"TKCH  scoreTexts.Length = {scoreTexts.Length}");
+            Debug.Log($"TKCH  Array.IndexOf(scoreTexts, pointText) = {Array.IndexOf(scoreTexts, pointText)}");
+        }
+        else
+        {
+            table._Log($"TKCH PlayerRow::DecodedSyncValues_Frame5() [{GetInstanceID()}] table is null ? {ReferenceEquals(null, table)}");
+            table._Log($"TKCH  scoreSigned is null ? {ReferenceEquals(null, scoreSigned)}");
+            table._Log($"TKCH  scoreSigned.Length = {scoreSigned.Length}");
+            table._Log($"TKCH  scoreTexts is null ? {ReferenceEquals(null, scoreTexts)}");
+            table._Log($"TKCH  scoreTexts.Length = {scoreTexts.Length}");
+            table._Log($"TKCH  Array.IndexOf(scoreTexts, pointText) = {Array.IndexOf(scoreTexts, pointText)}");
+        }
+#endif
+        int shotCount = (int)((value >> 27) & 0x1Fu);
+        int safeNoPocketShotCount = (int)((value >> 22) & 0x1Fu);
+        int scratchCount = (int)((value >> 17) & 0x1Fu);
+        int pocketBallCount = (int)((value >> 12) & 0x1Fu);
+        int invalidPocketBallCount = (int)((value >> 7) & 0x1Fu);
+        int point = (int)((value >> 0) & 0x7Fu);
+        if (scoreSigned[Array.IndexOf(scoreTexts, pointText)])
+        {
+            uint u = (value >> 0) & 0x3Fu;
+            if (0 < ((value >> 0) & 0x40u))
+            {
+                u |= 0xFFFFFFC0u;
+                u = ~u;
+                point = 0 - ((int)u + 1);
+            }
+            else
+            {
+                point = (int)u;
+            }
+        }
+
+        return new[] { point, shotCount, safeNoPocketShotCount, scratchCount, pocketBallCount, invalidPocketBallCount };
+    }
+#endif
+
+    // private void Start()
+    public void Init()
+    {
+#if TKCH_DEBUG_SCORE
+        if (ReferenceEquals(null, table))
+        {
+            Debug.Log($"TKCH PlayerRow::Init() [{GetInstanceID()}] table is null ? {ReferenceEquals(null, table)}");
+        }
+        else
+        {
+            table._Log($"TKCH PlayerRow::Init() [{GetInstanceID()}] table is null ? {ReferenceEquals(null, table)}");
+        }
+#endif
         allTexts = new[] { nameText, pointText, shotCountText, safeNoPocketShotCountText, scratchCountText, pocketBallCountText, invalidPocketBallCountText};
         scoreTexts = new[] { pointText, shotCountText, safeNoPocketShotCountText, scratchCountText, pocketBallCountText, invalidPocketBallCountText };
         /*
@@ -350,6 +445,57 @@ public class PlayerRow : UdonSharpBehaviour
         
         return scoreSyncValue;
     }
+
+    public uint EncodeScoreSyncValue_Frame5()
+    {
+        return EncodeScoreParams_Frame5(
+            scores[Array.IndexOf(scoreTexts, pointText)],
+            new int[]
+            {
+                scores[Array.IndexOf(scoreTexts, shotCountText)],
+                scores[Array.IndexOf(scoreTexts, safeNoPocketShotCountText)],
+                scores[Array.IndexOf(scoreTexts, scratchCountText)],
+                scores[Array.IndexOf(scoreTexts, pocketBallCountText)],
+                scores[Array.IndexOf(scoreTexts, invalidPocketBallCountText)]
+            }
+        );
+    }
+
+    public uint EncodeScoreParams_Frame5(int totalPoint, int[] scores)
+    {
+        int[] frames = new int[5];
+        for (int i = 0; i < frames.Length; i++)
+        {
+            if (i < scores.Length)
+            {
+                frames[i] = scores[i];
+            }
+            else
+            {
+                break;
+            }
+        }
+        
+        uint scoreSyncValue = 0x0u;
+        scoreSyncValue |= (uint)((frames[0] & 0x1Fu) << 27);
+        scoreSyncValue |= (uint)((frames[1] & 0x1Fu) << 22);
+        scoreSyncValue |= (uint)((frames[2] & 0x1Fu) << 17);
+        scoreSyncValue |= (uint)((frames[3] & 0x1Fu) << 12);
+        scoreSyncValue |= (uint)((frames[4] & 0x1Fu) << 7);
+        // scoreSyncValue |= (uint)((totalPoint & 0x7Fu) << 0);
+        if (scoreSigned[Array.IndexOf(scoreTexts, pointText)])
+        {
+            scoreSyncValue |= (uint)(
+                totalPoint & 0x3Fu | (totalPoint < 0 ? 0x40u : 0x0u)
+            ) << 0;
+        }
+        else
+        {
+            scoreSyncValue |= (uint)(totalPoint & 0x7Fu) << 0;
+        }
+        
+        return scoreSyncValue;
+    }
 #endif
     
     /*
@@ -382,19 +528,40 @@ public class PlayerRow : UdonSharpBehaviour
         }
     }
 
-    public void Clear()
+    public void Clear(bool setScoreTextZero)
     {
 #if TKCH_DEBUG_SCORE
-        table._Log("TKCH PlayerRow::Clear() [{GetInstanceID()}]");
-        //Debug.Log($"TKCH PlayerRow::Clear() [{GetInstanceID()}]");
-#endif
-        foreach (Text textComponent in allTexts)
+        if (ReferenceEquals(null, table))
         {
-            if (ReferenceEquals(null, textComponent))
+            Debug.Log($"TKCH PlayerRow::Clear( setScoreTextZero = {setScoreTextZero} ) [{GetInstanceID()}] table is null ? {ReferenceEquals(null, table)}");
+        }
+        else
+        {
+            table._Log($"TKCH PlayerRow::Clear( setScoreTextZero = {setScoreTextZero} ) [{GetInstanceID()}] table is null ? {ReferenceEquals(null, table)}");
+        }
+#endif
+        if (setScoreTextZero)
+        {
+            foreach (Text textComponent in scoreTexts)
             {
-                continue;
+                if (ReferenceEquals(null, textComponent))
+                {
+                    continue;
+                }
+                textComponent.text = "0";
+                //scoreDict[textComponent] = 0;
             }
-            textComponent.text = string.Empty;
+        }
+        else
+        {
+            foreach (Text textComponent in allTexts)
+            {
+                if (ReferenceEquals(null, textComponent))
+                {
+                    continue;
+                }
+                textComponent.text = string.Empty;
+            }
         }
         for (int i = 0; i < scores.Length; i++)
         {
@@ -402,11 +569,18 @@ public class PlayerRow : UdonSharpBehaviour
         }
     }
 
+/*    
     public void Init()
     {
 #if TKCH_DEBUG_SCORE
-        table._Log($"TKCH PlayerRow::Init() [{GetInstanceID()}]");
-        //Debug.Log($"TKCH PlayerRow::Init() [{GetInstanceID()}]");
+        if (ReferenceEquals(null, table))
+        {
+            Debug.Log($"TKCH PlayerRow::Init() [{GetInstanceID()}] table is null ? {ReferenceEquals(null, table)}");
+        }
+        else
+        {
+            table._Log($"TKCH PlayerRow::Init() [{GetInstanceID()}] table is null ? {ReferenceEquals(null, table)}");
+        }
 #endif
         foreach (Text textComponent in scoreTexts)
         {
@@ -422,20 +596,27 @@ public class PlayerRow : UdonSharpBehaviour
             scores[i] = 0;
         }
     }
+*/
     
     public void SetName(string str)
     {
 #if TKCH_DEBUG_SCORE
-        table._Log($"TKCH PlayerRow::SetName() [{GetInstanceID()}] nameText => {nameText.text}, str => {str}");
-        //Debug.Log($"TKCH PlayerRow::SetName() [{GetInstanceID()}] {str}");
+        if (ReferenceEquals(null, table))
+        {
+            Debug.Log($"TKCH PlayerRow::SetName() [{GetInstanceID()}] table is null ? {ReferenceEquals(null, table)}, nameText => {nameText.text}, str => {str}");
+        }
+        else
+        {
+            table._Log($"TKCH PlayerRow::SetName() [{GetInstanceID()}] table is null ? {ReferenceEquals(null, table)}, nameText => {nameText.text}, str => {str}");
+        }
 #endif
         if (nameText.text == string.Empty && str != string.Empty)
         {
-            Init();
+            Clear(true);
         }
         else if (nameText.text != string.Empty && str == string.Empty)
         {
-            Clear();
+            Clear(false);
         }
         nameText.text = str;
     }
@@ -545,9 +726,36 @@ public class PlayerRow : UdonSharpBehaviour
         return scores[Array.IndexOf(scoreTexts, invalidPocketBallCountText)];
     }
 
+    public int[] GetScores()
+    {
+        return (int[])(scores.Clone());
+    }
+
+    public int GetScoreByColIndex(int colIndex)
+    {
+        return scores[colIndex];
+    }
+
+    public void SetTextByColIndex(string text, int colIndex)
+    {
+        scoreTexts[colIndex].text = text;
+    }
+
     public void SetPointSigned(bool signed)
     {
         scoreSigned[Array.IndexOf(scoreTexts, pointText)] = signed;
+    }
+
+    public void SetPointSignedByArray(bool[] signedArray)
+    {
+        Array.Copy(signedArray, scoreSigned, scoreSigned.Length);
+        // UpdateText();
+    }
+
+    public void SetScoreByArray(int[] scoreArray)
+    {
+        Array.Copy(scoreArray, scores, scores.Length);
+        UpdateText();
     }
 
     public void SetSafeNoPocketShotCountEmptyTextOnZero(bool emptyTextOnZero)
@@ -563,6 +771,34 @@ public class PlayerRow : UdonSharpBehaviour
         //Debug.Log("TKCH PlayerRow::SetInvalidPocketBallCountEmptyTextOnZero()");
 #endif
         scoreEmptyTextOnZero[Array.IndexOf(scoreTexts, invalidPocketBallCountText)] = emptyTextOnZero;
+        UpdateText();
+    }
+    
+    public void SetEmptyTextOnZero(bool emptyTextOnZero)
+    {
+        for (int i = 0; i < scoreEmptyTextOnZero.Length; i++)
+        {
+            scoreEmptyTextOnZero[i] = emptyTextOnZero;
+        }
+        UpdateText();
+    }
+
+    public void SetEmptyTextOnZeroByColIndex(bool emptyTextOnZero, int colIndex)
+    {
+#if TKCH_DEBUG_SCORE
+        table._Log($"TKCH PlayerRow::SetEmptyTextOnZeroByColIndex(emptyTextOnZero = {colIndex}, emptyTextOnZero = {colIndex}) [{GetInstanceID()}]");
+        table._Log($"TKCH  scoreTexts.name = {scoreTexts[colIndex].name}");
+#endif
+        scoreEmptyTextOnZero[colIndex] = emptyTextOnZero;
+        UpdateText();
+    }
+    
+    public void SetEmptyTextOnZeroByArray(bool[] emptyTextOnZeroArray)
+    {
+#if TKCH_DEBUG_SCORE
+        table._Log($"TKCH PlayerRow::SetEmptyTextOnZeroByArray(emptyTextOnZeroArray = {emptyTextOnZeroArray}) [{GetInstanceID()}]");
+#endif
+        scoreEmptyTextOnZero = emptyTextOnZeroArray;
         UpdateText();
     }
 }
