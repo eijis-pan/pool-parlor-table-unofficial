@@ -879,7 +879,7 @@ public class LegacyPhysicsManager : UdonSharpBehaviour
         {
             balls_V[id] = Vector3.zero;
             balls_W[id] = Vector3.zero;
-            table._TriggerPocketBall(id, 0 <= balls_P[id].z ? 4 : 5);
+            table._TriggerPocketBall(id, -1);
             return;
         }
 
@@ -887,7 +887,7 @@ public class LegacyPhysicsManager : UdonSharpBehaviour
         {
             balls_V[id] = Vector3.zero;
             balls_W[id] = Vector3.zero;
-            table._TriggerPocketBall(id, (0 < balls_P[id].z ? (0 < balls_P[id].x ? 0 : 2) : (0 < balls_P[id].x ? 1 : 3)));
+            table._TriggerPocketBall(id, -1);
             return;
         }
     }
