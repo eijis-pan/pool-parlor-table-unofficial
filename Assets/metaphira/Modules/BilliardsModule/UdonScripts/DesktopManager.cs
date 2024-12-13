@@ -331,6 +331,7 @@ public class DesktopManager : UdonSharpBehaviour
         return id;
     }
 
+    /*
     private int[] ballOrder = { 0, 2, 3, 4, 5, 6, 7, 8, 1, 9, 10, 11, 12, 13, 14, 15 };
 
     private int nextBallOrder(bool asc)
@@ -408,6 +409,119 @@ public class DesktopManager : UdonSharpBehaviour
 #if TKCH_DEBUG_DESKTOP_BALLORDER
         table._LogInfo($"  next ball id = {id} return");
 #endif
+        return id;
+    }
+    */
+
+    private int nextBallOrder(bool asc)
+    {
+#if EIJIS_DEBUG_BALLORDER
+        table._LogInfo($"DesktopManager::nextBallOrder(asc = {asc})");
+#endif
+        int id = 0;
+        uint calledBalls = table.calledBallsLocal;
+        for (int i = 1; i < table.ballsP.Length; i++)
+        {
+            if (((calledBalls >> i) & 0x1u) != 0)
+            {
+                id = i;
+                break;
+            }
+        }
+#if EIJIS_DEBUG_BALLORDER
+        table._LogInfo($"  before called ball id = {id}");
+#endif
+
+        uint ballsPocketed = table.ballsPocketedLocal;
+        float before_x = table.ballsP[id].x;
+        float before_z = table.ballsP[id].z;
+        float nearest_x = asc ? float.MaxValue : float.MinValue;
+        float nearest_z = asc ? float.MaxValue : float.MinValue;
+        int farestId = 0;
+        float farest_x = asc ? float.MaxValue : float.MinValue;
+        float farest_z = asc ? float.MaxValue : float.MinValue;
+        for (int i = 1; i <= 15; i++)
+        {
+            if (i == id)
+            {
+                continue;
+            }
+            
+            if (((ballsPocketed >> i) & 0x1u) != 0)
+            {
+                continue;
+            }
+
+            float current_x = table.ballsP[i].x;
+            float current_z = table.ballsP[i].z;
+#if EIJIS_DEBUG_BALLORDER
+            // table._LogInfo($"  before_x = {before_x}, current_x = {current_x}");
+#endif
+            if ((asc && before_x < current_x) || (!asc && before_x > current_x))
+            {
+                if ((asc && current_x < nearest_x) || (!asc && current_x > nearest_x))
+                {
+                    nearest_x = current_x;
+                    id = i;
+#if EIJIS_DEBUG_BALLORDER
+                    // table._LogInfo($"  found ball by x id = {id}");
+#endif
+                }
+                else if (current_x == nearest_x)
+                {
+#if EIJIS_DEBUG_BALLORDER
+                    // table._LogInfo($"  before_z = {before_z}, current_z = {current_z}");
+#endif
+                    if ((asc && before_z < current_z) || (!asc && before_z > current_z))
+                    {
+                        if ((asc && current_z < nearest_z) || (!asc && current_z > nearest_z))
+                        {
+                            nearest_z = current_z;
+                            id = i;
+#if EIJIS_DEBUG_BALLORDER
+                            // table._LogInfo($"  found ball by z id = {id}");
+#endif
+                        }
+                    }
+                }
+            }
+            
+#if EIJIS_DEBUG_BALLORDER
+            table._LogInfo($"  farest_x = {farest_x}, current_x = {current_x}");
+#endif
+            if ((!asc && farest_x < current_x) || (asc && farest_x > current_x))
+            {
+                farest_x = current_x;
+                farestId = i;
+#if EIJIS_DEBUG_BALLORDER
+                table._LogInfo($"  found ball by x farestId = {farestId}");
+#endif
+            }
+            else if (current_x == farest_x)
+            {
+#if EIJIS_DEBUG_BALLORDER
+                table._LogInfo($"  farest_z = {farest_z}, current_z = {current_z}");
+#endif
+                if ((!asc && farest_z < current_z) || (asc && farest_z > current_z))
+                {
+                    farest_z = current_z;
+                    farestId = i;
+#if EIJIS_DEBUG_BALLORDER
+                    table._LogInfo($"  found ball by z farestId = {farestId}");
+#endif
+                }
+            }
+        }
+
+#if EIJIS_DEBUG_BALLORDER
+        table._LogInfo($"  nearest_x = {nearest_x}");
+        table._LogInfo($"  reverse side farestId = {farestId}");
+#endif
+        if (nearest_x == float.MaxValue || nearest_x == float.MinValue)
+        {
+            id = farestId;
+        }
+
         return id;
     }
 
