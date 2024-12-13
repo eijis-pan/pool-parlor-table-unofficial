@@ -34,9 +34,7 @@ using UnityEngine.UI;
 using VRC.SDKBase;
 using VRC.Udon;
 using System;
-using System.IO;
 using Metaphira.Modules.CameraOverride;
-using Unity.Mathematics;
 
 [UdonBehaviourSyncMode(BehaviourSyncMode.NoVariableSync)]
 public class BilliardsModule : UdonSharpBehaviour
@@ -227,6 +225,7 @@ public class BilliardsModule : UdonSharpBehaviour
     [NonSerialized] public bool teamsLocal;
     [NonSerialized] public bool noGuidelineLocal;
     [NonSerialized] public bool noLockingLocal;
+    private bool callShotOprationOverwriteModeLocal = true;
     [NonSerialized] public uint ballsPocketedLocal;
     [NonSerialized] public uint targetPocketedLocal;
     [NonSerialized] public uint otherPocketedLocal;
@@ -700,12 +699,20 @@ public class BilliardsModule : UdonSharpBehaviour
             calledBalls ^= 0x1u << id;
         }
 
-        if (calledBallsLocal != 0 && calledBalls != 0 && !desktop)
-        {
-            return;
+        if (!callShotOprationOverwriteModeLocal){
+            if (calledBallsLocal != 0 && calledBalls != 0 && !desktop)
+            {
+                return;
+            }
         }
 
-        if (Networking.LocalPlayer == null || Networking.GetOwner(activeCue.gameObject) != Networking.LocalPlayer) return;
+        if (Networking.LocalPlayer == null || Networking.GetOwner(activeCue.gameObject) != Networking.LocalPlayer)
+        {
+            if (localPlayerId != teamIdLocal)
+            {
+                return;
+            }
+        }
 
         bool enable = (calledBallsLocal < calledBalls);
         if (enable) semiAutoCalledTimeBall = (Networking.GetServerTimeInMilliseconds() - timerStartLocal) / 1000.0f;
@@ -769,12 +776,20 @@ public class BilliardsModule : UdonSharpBehaviour
             pointPockets ^= 0x1u << id;
         }
 
-        if (pointPocketsLocal != 0 && pointPockets != 0 && !desktop)
-        {
-            return;
+        if (!callShotOprationOverwriteModeLocal){
+            if (pointPocketsLocal != 0 && pointPockets != 0 && !desktop)
+            {
+                return;
+            }
         }
 
-        if (Networking.LocalPlayer == null || Networking.GetOwner(activeCue.gameObject) != Networking.LocalPlayer) return;
+        if (Networking.LocalPlayer == null || Networking.GetOwner(activeCue.gameObject) != Networking.LocalPlayer)
+        {
+            if (localPlayerId != teamIdLocal)
+            {
+                return;
+            }
+        }
 
         bool enable = (pointPocketsLocal < pointPockets);
         
