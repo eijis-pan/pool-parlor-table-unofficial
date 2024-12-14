@@ -114,7 +114,7 @@ namespace Metaphira.Modules.CameraOverride
             {
                 if (targetCamera != null) targetCamera.enabled = false;
                 // targetCamera.gameObject.SetActive(false);
-                referenceCamera.enabled = false;
+                if (referenceCamera != null) referenceCamera.enabled = false;
                 // referenceCamera.gameObject.SetActive(false);
             }
             else if (renderMode == RENDER_MODE_VR)
