@@ -170,6 +170,7 @@ namespace EijisPoolParlorTableUtil
 			"Assets/metaphira/Modules/BilliardsModule/UdonScripts/MenuManager.cs",
 			"Assets/metaphira/Modules/BilliardsModule/UdonScripts/NetworkingManager.cs",
 			"Assets/metaphira/Modules/BilliardsModule/UdonScripts/StandardPhysicsManager.cs",
+			"Assets/metaphira/Modules/CameraOverrideModule/UdonScripts/CameraOverrideModule.cs",
 		};
 		
 		[MenuItem("GameObject/TKCH/PoolParlor/ExportPackageStraight", false, 0)]
