@@ -308,7 +308,7 @@ public class DesktopManager : UdonSharpBehaviour
     private int nextPocketOrder(bool asc)
     {
         uint pockets = table.pointPocketsLocal;
-        int pocketCount = table.pcketLocations.Length;
+        int pocketCount = table.pocketLocations.Length;
         int id = (asc ? 0 : pocketOrder[pocketOrder.Length - 1]);
         for (int i = 0; i < pocketCount; i++)
         {

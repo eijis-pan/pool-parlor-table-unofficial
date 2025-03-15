@@ -199,10 +199,10 @@ public class BetaPhysicsManager : UdonSharpBehaviour
                         }
                         
                         hit = false;
-                        for (int i = 0; i < table.pcketLocations.Length; i++)
+                        for (int i = 0; i < table.pocketLocations.Length; i++)
                         {
                             // k_INNER_RADIUS = 0.072
-                            if ((lpos2 - table.pcketLocations[i]).sqrMagnitude < 0.004f) // 0.016f
+                            if ((lpos2 - table.pocketLocations[i]).sqrMagnitude < 0.004f) // 0.016f
                             {
                                 table._TriggerPocketHit(i, false);
                                 hit = true;

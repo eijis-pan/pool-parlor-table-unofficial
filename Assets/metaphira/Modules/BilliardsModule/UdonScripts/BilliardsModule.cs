@@ -301,7 +301,7 @@ public class BilliardsModule : UdonSharpBehaviour
     [NonSerialized] public CameraOverrideModule cameraOverrideModule;
     public string[] moderators = new string[0];
 
-    [NonSerialized] public Vector3[] pcketLocations = new Vector3[6];
+    [NonSerialized] public Vector3[] pocketLocations = new Vector3[6];
 
     private void OnEnable()
     {
@@ -373,12 +373,12 @@ public class BilliardsModule : UdonSharpBehaviour
         menuManager.menuSettings.transform.localScale = Vector3.zero;
 #endif
         
-        pcketLocations[0] = k_vE;
-        pcketLocations[1] = new Vector3(k_vE.x, k_vE.y, -k_vE.z);
-        pcketLocations[2] = new Vector3(-k_vE.x, k_vE.y, k_vE.z);
-        pcketLocations[3] = new Vector3(-k_vE.x, k_vE.y, -k_vE.z);
-        pcketLocations[4] = k_vF;
-        pcketLocations[5] = new Vector3(k_vF.x, k_vF.y, -k_vF.z);
+        pocketLocations[0] = k_vE;
+        pocketLocations[1] = new Vector3(k_vE.x, k_vE.y, -k_vE.z);
+        pocketLocations[2] = new Vector3(-k_vE.x, k_vE.y, k_vE.z);
+        pocketLocations[3] = new Vector3(-k_vE.x, k_vE.y, -k_vE.z);
+        pocketLocations[4] = k_vF;
+        pocketLocations[5] = new Vector3(k_vF.x, k_vF.y, -k_vF.z);
         findNearestPocket_x = k_vE.x / 2;
         findNearestPocket_n = findNearestPocket_x / k_vE.z;
     }
@@ -1766,7 +1766,7 @@ public class BilliardsModule : UdonSharpBehaviour
                 if (0 == (ballsPocketedLocal & 0x1u))
                 {
                     // aud_main.PlayOneShot(snd_PointMade, 1.0f);
-                    // graphicsManager._SpawnOnePocketPoint(pcketLocations[pocketId], true, (int)(teamIdLocal ^ teamColorLocal ^ 0x1U));
+                    // graphicsManager._SpawnOnePocketPoint(pocketLocations[pocketId], true, (int)(teamIdLocal ^ teamColorLocal ^ 0x1U));
                 }
 
                 calledBallsLocal = 0;
@@ -1776,7 +1776,7 @@ public class BilliardsModule : UdonSharpBehaviour
                 if (0 == id)
                 {
                     // aud_main.PlayOneShot(snd_PointMade, 1.0f);
-                    // graphicsManager._SpawnOnePocketPoint((pocketId < 0 ? balls[id].transform.localPosition : pcketLocations[pocketId]), false, -1);
+                    // graphicsManager._SpawnOnePocketPoint((pocketId < 0 ? balls[id].transform.localPosition : pocketLocations[pocketId]), false, -1);
                 }
                 else
                 {
