@@ -208,6 +208,9 @@ public class BilliardsModule : UdonSharpBehaviour
     [NonSerialized] public bool noGuidelineLocal;
     [NonSerialized] public bool noLockingLocal;
     private bool callShotOprationOverwriteModeLocal = true;
+    private bool cueBallFixed;
+    // private int cueBallRepositionCount = 0;
+    private int semiAutoCallDelayBase = 0;
     [NonSerialized] public uint ballsPocketedLocal;
     [NonSerialized] public uint targetPocketedLocal;
     [NonSerialized] public uint otherPocketedLocal;
@@ -302,6 +305,24 @@ public class BilliardsModule : UdonSharpBehaviour
     public string[] moderators = new string[0];
 
     [NonSerialized] public Vector3[] pocketLocations = new Vector3[6];
+
+    private Vector3[] findEasiestBallAndPocketConditions = new Vector3[]
+    {
+        // x:deg, y:t2p, z:c2t
+        new Vector3(60.0f, 0.09f, 0.09f), // 0.3f, 0.3f // 0.06 * 5
+        new Vector3(60.0f, 0.09f, 0.36f), // 0.3f, 0.6f // 0.06 * 5
+        new Vector3(45.0f, 0.36f, 0.36f), // 0.6f, 0.6f // 0.06 * 10
+        new Vector3(30.0f, 0.81f, 1.42f), // 0.9f, 1.2f // 0.06 * 12
+        new Vector3(60.0f, 0.09f, float.MaxValue), // 0.3f, - // 0.06 * 5
+        new Vector3(30.0f, 0.81f, 0.81f), // 0.9f, 0.9f // 0.06 * 12
+        new Vector3(45.0f, 0.36f, float.MaxValue), // 0.6f, - // 0.06 * 10
+        new Vector3(30.0f, 0.81f, float.MaxValue), // 0.9f, - // 0.06 * 12
+        new Vector3(15.0f, float.MaxValue, float.MaxValue),
+        new Vector3(30.0f, float.MaxValue, float.MaxValue),
+        new Vector3(45.0f, float.MaxValue, float.MaxValue),
+        new Vector3(60.0f, float.MaxValue, float.MaxValue),
+        new Vector3(float.MaxValue, float.MaxValue, float.MaxValue)
+    };
 
     private void OnEnable()
     {
@@ -403,6 +424,7 @@ public class BilliardsModule : UdonSharpBehaviour
         tickTimer();
         _Update9BallMarker();
         _UpdateCalledBallMarker();
+        if (semiAutoCallTick) tickSemiAutoCall();
 
         networkingManager._FlushBuffer();
         _EndPerf(PERF_MAIN);
@@ -769,6 +791,14 @@ public class BilliardsModule : UdonSharpBehaviour
             bool isTouching = (bool)currentPhysicsManager.GetProgramVariable("outIsTouching");
 
             consumeReposition = !isTouching;
+            
+            // // cueBallFixed = true;
+            // cueBallRepositionCount++;
+            // // semiAutoCalledTimeBall = 0;
+            semiAutoCallDelayBase = Networking.GetServerTimeInMilliseconds();
+#if EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
+            _LogInfo($"TKCH EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION semiAutoCallDelayBase = {semiAutoCallDelayBase}, cueBallRepositionCount = {cueBallRepositionCount}");
+#endif
         }
 
         networkingManager._OnRepositionBalls(ballsP, consumeReposition);
@@ -1500,10 +1530,21 @@ public class BilliardsModule : UdonSharpBehaviour
         _LogInfo("onRemoteTurnBegin");
         canPlayLocal = true;
         timerStartLocal = timerStartSynced;
+        semiAutoCallDelayBase = Networking.GetServerTimeInMilliseconds();
 
         enablePlayComponents();
         Array.Clear(ballsV, 0, ballsV.Length);
         Array.Clear(ballsW, 0, ballsW.Length);
+
+#if EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
+        _LogInfo($"TKCH EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}, cueBallRepositionCount = {cueBallRepositionCount}");
+#endif
+        // cueBallFixed = !isReposition || (0 < cueBallRepositionCount);
+        cueBallFixed = !isReposition;
+        // cueBallFixed = !isReposition && ((nextBallRepositionStateLocal & 0x3u) == 0);
+#if EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
+        _LogInfo($"TKCH EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}");
+#endif
 
         graphicsManager._UpdatePointPocketMarker(pointPocketsLocal, callShotLockLocal);
         // calledBallId = -2;
@@ -1620,6 +1661,7 @@ public class BilliardsModule : UdonSharpBehaviour
 
         _LogInfo($"onRemoteCalledBallsChanged calledBalls={calledBallsSynced:X4}");
         calledBallsLocal = calledBallsSynced;
+        semiAutoCallDelayBase = Networking.GetServerTimeInMilliseconds();
         if (!stateIdChanged)
         {
             aud_main.PlayOneShot(snd_btn);
@@ -2790,45 +2832,153 @@ public class BilliardsModule : UdonSharpBehaviour
         return 0;
     }
 
-    public int findNearestPocketFromBall(int ballId)
+    public uint findEasiestBallAndPocket(uint field)
     {
-        int pocketId = -1;
-        Vector3 ballPos = ballsP[ballId];
-        float abs_x = Mathf.Abs(ballPos.x);
-        float abs_z_n = Mathf.Abs(ballPos.z) * findNearestPocket_n;
-        bool nearSide = (abs_x + abs_z_n < findNearestPocket_x);
-        if (ballPos.z < 0)
+        Vector3[][] matrix = new Vector3[16][];
+        for (int i = 0; i < matrix.Length; i++)
         {
-            if (nearSide)
+            matrix[i] = new Vector3[pocketLocations.Length];
+            for (int j = 0; j < matrix[i].Length; j++)
             {
-                pocketId = 5;
-            }
-            else if (ballPos.x < 0)
-            {
-                pocketId = 3;
-            }
-            else
-            {
-                pocketId = 1;
-            }
-        }
-        else
-        {
-            if (nearSide)
-            {
-                pocketId = 4;
-            }
-            else if (ballPos.x < 0)
-            {
-                pocketId = 2;
-            }
-            else
-            {
-                pocketId = 0;
+                matrix[i][j] = Vector3.positiveInfinity;
             }
         }
 
-        return pocketId;
+        int[] matrixIndexPosListByCondition = new int[findEasiestBallAndPocketConditions.Length];
+        int[][] matrixIndexListByCondition = new int[findEasiestBallAndPocketConditions.Length][];
+        for (int i = 0; i < matrixIndexListByCondition.Length; i++)
+        {
+            matrixIndexPosListByCondition[i] = 0;
+            matrixIndexListByCondition[i] = new int[matrix.Length * matrix[0].Length];
+            for (int j = 0; j < matrixIndexListByCondition[i].Length; j++)
+            {
+                matrixIndexListByCondition[i][j] = -1;
+            }
+        }
+
+        for (int i = 1; i < 16; i++)
+        {
+            if (((field >> i) & 0x1U) == 0x1U)
+            {
+                continue;
+            }
+
+            Vector3 cue2target = ballsP[i] - ballsP[0];
+            float c2tRad = -Mathf.Atan2(cue2target.z, cue2target.x);
+            float c2tDeg = c2tRad * Mathf.Rad2Deg;
+            float c2tSqrMagnitude = Vector3.SqrMagnitude(cue2target);
+
+            for (int j = 0; j < pocketLocations.Length; j++)
+            {
+                Vector3 target2pocket = pocketLocations[j] - ballsP[i];
+                float t2pRad = -Mathf.Atan2(target2pocket.z, target2pocket.x);
+                float t2pDeg = t2pRad * Mathf.Rad2Deg;
+                float t2pSqrMagnitude = Vector3.SqrMagnitude(target2pocket);
+#if EIJIS_DEBUG_SEMIAUTO_CALL_SIDE
+                if (debugLogFlg && 4 <= j) _LogInfo($"  t{i} to side{j} t2pDeg = {t2pDeg}");
+#endif
+                if (4 <= j && ((t2pDeg < 0 &&(t2pDeg < -135 || -45 < t2pDeg)) || (0 <= t2pDeg &&(t2pDeg < 45 || 135 < t2pDeg))))
+                {
+#if EIJIS_DEBUG_SEMIAUTO_CALL_SIDE
+                    if (debugLogFlg) _LogInfo($"  side pocket skip");
+#endif
+                    continue;
+                }
+
+                float degDiff = c2tDeg - t2pDeg;
+                if (degDiff < 0)
+                {
+                    degDiff = -degDiff;
+                }
+                if (180 < degDiff)
+                {
+                    degDiff = 360 - degDiff;
+                }
+                
+                // x:deg, y:t2p, z:c2t
+                Vector3 p = matrix[i][j] = new Vector3(degDiff, t2pSqrMagnitude, c2tSqrMagnitude);
+#if EIJIS_DEBUG_SEMIAUTO_CALL_FINDLOGIC
+                // if (debugLogFlg) _LogInfo($"  matrix[{i}][{j}]] = {p.x}, {p.y}, {p.z}");
+#endif
+
+                 for (int k = 0; k < findEasiestBallAndPocketConditions.Length; k++)
+                {
+                    Vector3 c = findEasiestBallAndPocketConditions[k];
+                    if (p.x < c.x && p.y < c.y && p.z < c.z)
+                    {
+                        matrixIndexListByCondition[k][matrixIndexPosListByCondition[k]++] = (i * 16) + j;
+#if EIJIS_DEBUG_SEMIAUTO_CALL_FINDLOGIC
+                        // if (debugLogFlg) _LogInfo($"    k = {k},  (i * 16) + j = {matrixIndexListByCondition[k][matrixIndexPosListByCondition[k]-1]}");
+#endif
+                        break;
+                    }
+                }
+            }
+        }
+
+#if EIJIS_DEBUG_SEMIAUTO_CALL_FINDLOGIC
+        if (debugLogFlg)
+        {
+            for (int i = 0; i < matrixIndexPosListByCondition.Length; i++)
+            {
+                _LogInfo($"  matrixIndexPosListByCondition[{i}] = {matrixIndexPosListByCondition[i]}");
+                for (int j = 0; j < matrixIndexListByCondition[i].Length; j++)
+                {
+                    if (matrixIndexListByCondition[i][j] < 0) break;
+                    _LogInfo($"  matrixIndexListByCondition[{i}][{j}] = {matrixIndexListByCondition[i][j]}");
+                }
+            }
+        }
+#endif
+
+        int easiestBallId = -1;
+        int easiestPocketId = -1;
+        for (int i = 0; i < matrixIndexListByCondition.Length; i++)
+        {
+            int nearestBallId = -1;
+            int nearestPocketId = -1;
+            float minSqrMagnitude = float.MaxValue;
+            for (int j = 0; j < matrixIndexListByCondition[i].Length; j++)
+            {
+                int materixIndex = matrixIndexListByCondition[i][j];
+#if EIJIS_DEBUG_SEMIAUTO_CALL_FINDLOGIC
+                // if (debugLogFlg) _LogInfo($"  materixIndex = {materixIndex}, matrixIndexListByCondition[{i}][{j}]] = {matrixIndexListByCondition[i][j]}");
+#endif
+                if (materixIndex < 0 || matrixIndexPosListByCondition[i] <= j)
+                {
+                    continue;
+                }
+
+                int ballId = materixIndex / 16;
+                int pocketId = materixIndex % 16;
+                Vector3 p = matrix[ballId][pocketId];
+#if EIJIS_DEBUG_SEMIAUTO_CALL_FINDLOGIC
+                if (debugLogFlg) _LogInfo($"  materixIndex = {materixIndex}, matrixIndexListByCondition[{i}][{j}]] = {matrixIndexListByCondition[i][j]}");
+                if (debugLogFlg) _LogInfo($"  matrix[ballId = {ballId}][pocketId = {pocketId}]] = {p.x}, {p.y}, {p.z}");
+#endif
+                
+                float sqrMagnitude = p.z;
+                if (0 <= sqrMagnitude && sqrMagnitude < minSqrMagnitude)
+                {
+                    minSqrMagnitude = sqrMagnitude;
+                    nearestBallId = ballId;
+                    nearestPocketId = pocketId;
+                }
+            }
+
+            if (0 <= nearestBallId && 0 <= nearestPocketId)
+            {
+                easiestBallId = nearestBallId;
+                easiestPocketId = nearestPocketId;
+                break;
+            }
+        }
+        
+#if EIJIS_DEBUG_SEMIAUTO_CALL_FINDLOGIC
+        if (debugLogFlg) _LogInfo($"  easiestBallId = {easiestBallId}, easiestPocketId = {easiestPocketId}");
+#endif
+
+        return  ((easiestPocketId < 0 ? 0xFFFFu : (uint)easiestPocketId) << 16) | (easiestBallId < 0 ? 0xFFFFu : (uint)easiestBallId);
     }
 
     private void setBallPickupActive(int ballId, bool active)
@@ -2888,6 +3038,7 @@ public class BilliardsModule : UdonSharpBehaviour
             }
         }
 
+        /*
         if (isRotation && gameLive && canPlayLocal && afterBreak)
         {
             int target = findLowestUnpocketedBall(ballsPocketedLocal);
@@ -2922,6 +3073,107 @@ public class BilliardsModule : UdonSharpBehaviour
                     }
                 }
             }
+        }
+        */
+    }
+
+    private void tickSemiAutoCall()
+    {
+#if EIJIS_DEBUG_SEMIAUTO_CALL
+        // if (debugFlg) return;
+#endif
+        if (!isOurTurn() && 0 < semiAutoCalledTimeBall)
+        {
+            semiAutoCalledTimeBall = 0;
+            return;
+        }
+        
+#if EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
+        // if (debugLogFlg) _LogInfo($"TKCH EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}");
+#endif
+
+        if (isRotation && gameLive && canPlayLocal && isOurTurn() && afterBreak && cueBallFixed)
+        {
+#if EIJIS_DEBUG_SEMIAUTO_CALL_FINDLOGIC
+            // if (debugLogFlg) _LogInfo($"TKCH SEMIAUTO_CALL semiAutoCallBall = {semiAutoCallBallLocal}, semiAutoCalledTimeBall = {semiAutoCalledTimeBall}, calledBallId = {calledBallId}");
+            // if (debugLogFlg) _LogInfo($"                   semiAutoCallPocket = {semiAutoCallPocketLocal}, semiAutoCalledPocket = {semiAutoCalledPocket}, calledPocketId = {calledPocketId}, calledBalls = {calledBallsLocal:X4}");
+            if (debugLogFlg) _LogInfo($"TKCH SEMIAUTO_CALL                    semiAutoCalledTimeBall = {semiAutoCalledTimeBall}, calledBallId = {calledBallId}");
+            if (debugLogFlg) _LogInfo($"  semiAutoCall = {semiAutoCallLocal}, semiAutoCalledPocket = {semiAutoCalledPocket}, calledPocketId = {calledPocketId}, calledBalls = {calledBallsLocal:X4}");
+#endif
+            int target = -1;
+            int pocketId = -1;
+
+            if ((semiAutoCallBallLocal || semiAutoCallPocketLocal) && ((semiAutoCalledTimeBall <= 0 && calledBallId < 0) ||
+                                                                       (!semiAutoCalledPocket && calledPocketId < 0 && 0 < calledBallsLocal)))
+            {
+                uint findBalls = ballsPocketedLocal;
+                findBalls = ~(0x1u << findLowestUnpocketedBall(ballsPocketedLocal));
+                uint pocketAndBall = findEasiestBallAndPocket(findBalls);
+                if (pocketAndBall != 0xFFFFFFFF)
+                {
+                    target = (int)(pocketAndBall & 0xFFFFu);
+                    pocketId = (int)((pocketAndBall >> 16) & 0xFFFFu);
+                }
+            }
+            
+#if EIJIS_DEBUG_SEMIAUTO_CALL_FINDLOGIC || EIJIS_DEBUG_NEXT_BREAK
+            if (debugLogFlg) _LogInfo($"  target(final) = {target}");
+#endif
+#if EIJIS_DEBUG_SEMIAUTO_CALL_FINDLOGIC || EIJIS_DEBUG_SEMIAUTO_CALL_SIDE || EIJIS_DEBUG_NEXT_BREAK || EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
+            // debugLogFlg = false;
+            debugLogFlg = true;
+#endif
+            
+            if (0 < target)
+            {
+                float elapsedSeconds = (Networking.GetServerTimeInMilliseconds() - semiAutoCallDelayBase) / 1000.0f;
+                
+#if EIJIS_DEBUG_SEMIAUTO_CALL_FINDLOGIC
+                if (0.1f < elapsedSeconds && elapsedSeconds < 0.12f)
+                {
+                    // _LogInfo($"  semiAutoCalledBall = {semiAutoCalledBall}, calledBallId = {calledBallId}, target = {target}");
+                    _LogInfo($"  semiAutoCalledTimeBall = {semiAutoCalledTimeBall}, calledBallId = {calledBallId}, target = {target}");
+                }
+#endif
+
+                if (semiAutoCallBallLocal && semiAutoCalledTimeBall <= 0 && calledBallId < 0)
+                {
+#if EIJIS_DEBUG_SEMIAUTO_CALL
+                    _LogInfo($"  elapsedSeconds = {elapsedSeconds}");
+#endif
+                    if (semiAutoCallDelay < elapsedSeconds)
+                    {
+#if EIJIS_DEBUG_SEMIAUTO_CALL
+                        _LogInfo($"  elapsedSeconds = {elapsedSeconds}, call _TriggerOtherBallHit(target = {target})");
+#endif
+                        _TriggerOtherBallHit(target, true);
+                        semiAutoCalledTimeBall = semiAutoCallDelay;
+                    }
+                }
+            }
+                
+            if (semiAutoCallPocketLocal && !semiAutoCalledPocket && calledPocketId < 0 && 0 < calledBallsLocal)
+            {
+                float elapsedSeconds = (Networking.GetServerTimeInMilliseconds() - semiAutoCallDelayBase) / 1000.0f;
+#if EIJIS_DEBUG_SEMIAUTO_CALL
+                _LogInfo($"  elapsedSeconds = {elapsedSeconds}");
+#endif
+                if (semiAutoCallDelay + semiAutoCalledTimeBall < elapsedSeconds)
+                {
+#if EIJIS_DEBUG_SEMIAUTO_CALL
+                    _LogInfo($"  elapsedSeconds = {elapsedSeconds}, call _TriggerPocketHit(pocketId = {pocketId}, TRUE)");
+#endif
+                    _TriggerPocketHit(pocketId, true);
+                    semiAutoCalledPocket = true;
+#if EIJIS_DEBUG_SEMIAUTO_CALL
+                    // debugFlg = false;
+#endif
+                }
+            }
+            
+#if EIJIS_DEBUG_SEMIAUTO_CALL_FINDLOGIC || EIJIS_DEBUG_SEMIAUTO_CALL_SIDE || EIJIS_DEBUG_NEXT_BREAK || EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
+            debugLogFlg = false;
+#endif
         }
     }
 
