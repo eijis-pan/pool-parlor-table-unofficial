@@ -3181,7 +3181,8 @@ public class BilliardsModule : UdonSharpBehaviour
                     //     ballsP[touching].y,
                     //     ballsP[touching].z
                     // );
-                    float distanceZ = ballsP[i].z;
+                    // float distanceZ = ballsP[i].z;
+                    float distanceZ = ballsP[touching].z;
                     float adjustX = Mathf.Sqrt(Mathf.Pow(k_BALL_DIAMETRE, 2f) - Mathf.Pow(distanceZ, 2f));
 #if TKCH_DEBUG_UPON_FOOT
                     _LogInfo($"  distanceZ = {distanceZ}, adjustX = {adjustX}");
