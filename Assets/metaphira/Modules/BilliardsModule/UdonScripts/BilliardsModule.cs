@@ -47,7 +47,8 @@ public class BilliardsModule : UdonSharpBehaviour
     private GameObject auto_colliderBaseVFX;
     [NonSerialized] public Transform table;
     [NonSerialized] public GameObject[] pointPocketMarkers;
-    [NonSerialized] public GameObject[] pointPocketMarkerSphere;
+    [NonSerialized] public GameObject[] pointPocketMarkerCalled;
+    [NonSerialized] public GameObject[] pointPocketMarkerNoCall;
     private float findNearestPocket_x;
     private float findNearestPocket_n;
 
@@ -963,6 +964,8 @@ public class BilliardsModule : UdonSharpBehaviour
         // propagate valid players second
         onRemotePlayersChanged(networkingManager.playerNamesSynced);
 
+        bool stateIdChanged = (networkingManager.stateIdSynced != stateIdLocal);
+
         bool scoreUpdate = true;
         if (lobbyOpen || gameLive)
         {
@@ -999,10 +1002,9 @@ public class BilliardsModule : UdonSharpBehaviour
         Array.Copy(networkingManager.chainedFoulsSynced, chainedFoulsLocal, chainedFoulsLocal.Length);
         onRemoteRepositionStateChanged(networkingManager.repositionStateSynced);
         onRemoteIsTableOpenChanged(networkingManager.isTableOpenSynced, networkingManager.teamColorSynced);
-        onRemoteTurnStateChanged(networkingManager.turnStateSynced);
+        onRemoteTurnStateChanged(networkingManager.turnStateSynced, stateIdChanged);
         onRemotePreviewWinningTeamChanged(networkingManager.previewWinningTeamSynced);
 
-        bool stateIdChanged = (networkingManager.stateIdSynced != stateIdLocal);
         onRemotePointPocketsChanged(networkingManager.pointPocketsSynced, networkingManager.callShotLockSynced, 
             stateIdChanged);
         onRemoteCalledBallsChanged(networkingManager.calledBallsSynced, stateIdChanged);
@@ -1374,6 +1376,7 @@ public class BilliardsModule : UdonSharpBehaviour
         graphicsManager._UpdateTeamColor(winningTeamSynced);
         graphicsManager._UpdateScorecard();
         graphicsManager._RackBalls();
+        graphicsManager._DisablePointPocketMarker();
 
         disablePlayComponents();
 
@@ -1547,7 +1550,7 @@ public class BilliardsModule : UdonSharpBehaviour
         _UpdateNextBallRepositionSpotMarker();
     }
 
-    private void onRemoteTurnBegin(int timerStartSynced)
+    private void onRemoteTurnBegin(int timerStartSynced, bool stateIdChanged)
     {
         _LogInfo("onRemoteTurnBegin");
         canPlayLocal = true;
@@ -1568,7 +1571,14 @@ public class BilliardsModule : UdonSharpBehaviour
         _LogInfo($"TKCH EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}");
 #endif
 
-        graphicsManager._UpdatePointPocketMarker(pointPocketsLocal, callShotLockLocal);
+        if (isRotation && (afterBreak || !stateIdChanged))
+        {
+            graphicsManager._UpdatePointPocketMarker(pointPocketsLocal, callShotLockLocal);
+        }
+        else
+        {
+            graphicsManager._DisablePointPocketMarker();
+        }
         // calledBallId = -2;
         // calledPocketId = -2;
         // semiAutoCalledBall = false;
@@ -1619,7 +1629,7 @@ public class BilliardsModule : UdonSharpBehaviour
         auto_colliderBaseVFX.SetActive(true);
     }
 
-    private void onRemoteTurnStateChanged(byte turnStateSynced)
+    private void onRemoteTurnStateChanged(byte turnStateSynced, bool stateIdChanged)
     {
         if (!gameLive) return;
 
@@ -1632,7 +1642,7 @@ public class BilliardsModule : UdonSharpBehaviour
         {
             if (turnStateLocal == 2) turnStateLocal = 0; // synthetic state
 
-            onRemoteTurnBegin(networkingManager.timerStartSynced);
+            onRemoteTurnBegin(networkingManager.timerStartSynced, stateIdChanged);
             // practiceManager._Record();
         }
         else if (turnStateLocal == 1)
@@ -1643,7 +1653,7 @@ public class BilliardsModule : UdonSharpBehaviour
         else if (turnStateLocal == 3) // choice options after foul
         {
             turnStateLocal = 0; // synthetic state
-            onRemoteTurnBegin(networkingManager.timerStartSynced);
+            onRemoteTurnBegin(networkingManager.timerStartSynced, stateIdChanged);
         }
         else
         {
@@ -1661,7 +1671,10 @@ public class BilliardsModule : UdonSharpBehaviour
         _LogInfo($"onRemotePointPocketsChanged pointPockets={pointPocketsSynced:X2}, callShotLock={callShotLockSynced}");
         pointPocketsLocal = pointPocketsSynced;
         callShotLockLocal = callShotLockSynced;
-        graphicsManager._UpdatePointPocketMarker(pointPocketsLocal, callShotLockLocal);
+        if (isRotation && (afterBreak || !stateIdChanged))
+        {
+            graphicsManager._UpdatePointPocketMarker(pointPocketsLocal, callShotLockLocal);
+        }
         if (!stateIdChanged)
         {
             aud_main.PlayOneShot(snd_btn);
@@ -2290,12 +2303,14 @@ public class BilliardsModule : UdonSharpBehaviour
         auto_colliderBaseVFX = table_base.Find("collision.vfx").gameObject;
 
         pointPocketMarkers = new GameObject[6];
-        pointPocketMarkerSphere = new GameObject[pointPocketMarkers.Length];
+        pointPocketMarkerCalled = new GameObject[pointPocketMarkers.Length];
+        pointPocketMarkerNoCall = new GameObject[pointPocketMarkers.Length];
         for (int i = 0; i < pointPocketMarkers.Length; i++)
         {
             Transform pointPocketMarker = table_base.Find($"PointPocketMarker_{i}");
             pointPocketMarkers[i] = pointPocketMarker.gameObject;
-            pointPocketMarkerSphere[i] = pointPocketMarker.Find("Sphere").gameObject;
+            pointPocketMarkerCalled[i] = pointPocketMarker.Find("Called").gameObject;
+            pointPocketMarkerNoCall[i] = pointPocketMarker.Find("noCall").gameObject;
         }
 
         Transform transformSurface = (Transform)currentPhysicsManager.GetProgramVariable("transform_Surface");
@@ -2798,7 +2813,7 @@ public class BilliardsModule : UdonSharpBehaviour
     
     public void _UpdateNextBallRepositionSpotMarker()
     {
-        if (!isOurTurn() || nextBallRepositionStateLocal == 0 || callShotLockLocal)
+        if (/* !isOurTurn() || */ nextBallRepositionStateLocal == 0 || callShotLockLocal)
         {
             markerHeadSpot.SetActive(false);
             markerCenterSpot.SetActive(false);
@@ -2807,10 +2822,14 @@ public class BilliardsModule : UdonSharpBehaviour
             requestBreakBlue.SetActive(false);
             return;
         }
+        
+        bool isOurTurnVar = isOurTurn();
 
         if ((nextBallRepositionStateLocal & 0x1u) > 0 )
         {
+            markerCenterSpot.GetComponent<Collider>().enabled = isOurTurnVar;
             markerCenterSpot.SetActive(true);
+            markerFootSpot.GetComponent<Collider>().enabled = isOurTurnVar;
             markerFootSpot.SetActive(true);
         }
         else
@@ -2823,6 +2842,7 @@ public class BilliardsModule : UdonSharpBehaviour
         {
             if (chainedFoulsLocal[teamIdLocal ^ 0x1u] < 3)
             {
+                markerHeadSpot.GetComponent<Collider>().enabled = isOurTurnVar;
                 markerHeadSpot.SetActive(true);
             }
             else
@@ -2842,6 +2862,8 @@ public class BilliardsModule : UdonSharpBehaviour
         
         if ((nextBallRepositionStateLocal & 0x4u) > 0 )
         {
+            requestBreakOrange.GetComponent<Collider>().enabled = isOurTurnVar;
+            requestBreakBlue.GetComponent<Collider>().enabled = isOurTurnVar;
             requestBreakOrange.SetActive(true);
             requestBreakBlue.SetActive(true);
         }

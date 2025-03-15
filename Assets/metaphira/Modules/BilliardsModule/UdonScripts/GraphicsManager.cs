@@ -11,11 +11,11 @@ public class GraphicsManager : UdonSharpBehaviour
 {
     [Header("Pocket Billiard Additional")]
     [SerializeField] GameObject[] cushionTouch;
-    [SerializeField] Material calledPocketBlue;
-    [SerializeField] Material calledPocketOrange;
-    [SerializeField] Material calledPocketSphereBlue;
-    [SerializeField] Material calledPocketSphereOrange;
-    [SerializeField] Material calledPocketSphereWhite;
+    // [SerializeField] Material calledPocketBlue;
+    // [SerializeField] Material calledPocketOrange;
+    [SerializeField] Material calledPocketCalledBlue;
+    [SerializeField] Material calledPocketCalledOrange;
+    [SerializeField] Material calledPocketCalledWhite;
     [SerializeField] Material calleShotLockBlue;
     [SerializeField] Material calleShotLockOrange;
     [SerializeField] Material calleShotLockWhite;
@@ -862,6 +862,8 @@ int uniform_cue_colour;
         table.transform.Find("intl.controls/redo").gameObject.SetActive(false);
         table.transform.Find("intl.controls/skipturn").gameObject.SetActive(false);
         _HideTimers();
+        
+        _DisablePointPocketMarker();
 
         winnerText.text = "";
         lobbyStatusText.text = "";
@@ -982,15 +984,18 @@ int uniform_cue_colour;
         for (int i = 0; i < table.pointPocketMarkers.Length; i++)
         {
             bool enable = (pointPockets & (0x1u << i)) != 0;
+            table.pointPocketMarkers[i].SetActive(true);
             if (enable)
             {
-                table.pointPocketMarkers[i].GetComponent<MeshRenderer>().material =
-                    (table.teamIdLocal ^ table.teamColorLocal) == 0 ? calledPocketBlue : calledPocketOrange;
-                table.pointPocketMarkerSphere[i].GetComponent<MeshRenderer>().material =
-                    (callShotLock ? calledPocketSphereWhite :
-                        (table.teamIdLocal ^ table.teamColorLocal) == 0 ? calledPocketSphereBlue : calledPocketSphereOrange);
+                // table.pointPocketMarkers[i].GetComponent<MeshRenderer>().material =
+                //     (table.teamIdLocal ^ table.teamColorLocal) == 0 ? calledPocketBlue : calledPocketOrange;
+                table.pointPocketMarkerCalled[i].GetComponent<MeshRenderer>().material =
+                    (callShotLock ? calledPocketCalledWhite :
+                        (table.teamIdLocal ^ table.teamColorLocal) == 0 ? calledPocketCalledBlue : calledPocketCalledOrange);
             }
-            table.pointPocketMarkers[i].SetActive(enable);
+            table.pointPocketMarkerNoCall[i].SetActive(!enable && ! callShotLock);
+            table.pointPocketMarkerCalled[i].SetActive(enable);
+            // table.pointPocketMarkers[i].SetActive(enable);
         }
 
         table.transform.Find("intl.controls/callShotLock/render").GetComponent<MeshRenderer>().material =

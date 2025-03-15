@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: PocketMarker_Orange
-  m_Shader: {fileID: 4800000, guid: 362c941fef704dd46a03ef71fa790e5e, type: 3}
+  m_Shader: {fileID: 4800000, guid: abde177d175cbb347b65ed762069ab49, type: 3}
   m_ShaderKeywords: 
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -76,5 +76,5 @@ Material:
     - _UVSec: 0
     - _ZWrite: 1
     m_Colors:
-    - _Color: {r: 0.8796226, g: 0.13013652, b: 0.015208514, a: 1}
+    - _Color: {r: 3.5137255, g: 0.5176471, b: 0.0627451, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
