@@ -19,6 +19,8 @@ public class GraphicsManager : UdonSharpBehaviour
     [SerializeField] Material calleShotLockBlue;
     [SerializeField] Material calleShotLockOrange;
     [SerializeField] Material calleShotLockWhite;
+    [SerializeField] Material pushOutDont;
+    [SerializeField] Material pushOutDoing;
 
     [Header("4 Ball")]
     [SerializeField] GameObject fourBallPoint;
@@ -1009,6 +1011,12 @@ int uniform_cue_colour;
         {
             table.pointPocketMarkers[i].SetActive(false);
         }
+    }
+
+    public void _UpdatePushOut(byte pushOutState)
+    {
+        table.transform.Find("intl.controls/pushOut/render").GetComponent<MeshRenderer>().material =
+            (pushOutState == table.PUSHOUT_DOING ? pushOutDoing : pushOutDont);
     }
 
     public bool _IsUsingTableTimer()

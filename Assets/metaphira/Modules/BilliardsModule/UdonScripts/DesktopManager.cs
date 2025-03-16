@@ -21,6 +21,9 @@ public class DesktopManager : UdonSharpBehaviour
     [SerializeField] private GameObject jumpIndicator;
     [SerializeField] private GameObject powerIndicator;
     [SerializeField] private GameObject pressE;
+    [SerializeField] private GameObject callShot;
+    [SerializeField] private GameObject pushOut;
+    [SerializeField] private GameObject pushOutDoing;
 
     private BilliardsModule table;
 
@@ -54,6 +57,8 @@ public class DesktopManager : UdonSharpBehaviour
         table = table_;
         cursorClampX = table.k_TABLE_WIDTH;
         cursorClampZ = table.k_TABLE_HEIGHT;
+        Transform callShot = table.transform.Find("intl.desktop/desktop/desktop_callShot");
+        Transform pushOut = table.transform.Find("intl.desktop/desktop/desktop_pushOut");
     }
 
     public void _OnGameStarted()
@@ -239,11 +244,15 @@ public class DesktopManager : UdonSharpBehaviour
                 updateSpinIndicator();
                 updateJumpIndicator();
                 updateCallShotIndicator();
+                updateCallShotIndicator();
+                if (table.enablePushOutLocal) updatePushOutIndicator();
             }
         }
 
         cursorIndicator.transform.localPosition = cursor;
         powerIndicator.transform.localScale = new Vector3(1.0f - (power * 2.0f), 1.0f, 1.0f);
+
+        pushOutDoing.SetActive(table.pushOutStateLocal == table.PUSHOUT_DOING);
 
         bool hitCtrlNow = Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.RightControl);
         bool hitCtrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
@@ -505,6 +514,16 @@ public class DesktopManager : UdonSharpBehaviour
         }
     }
 
+    private void updatePushOutIndicator()
+    {
+        if (!pushOut.activeSelf) return;
+        
+        if (Input.GetKeyDown(KeyCode.O))
+        { 
+            table._PushOut();
+        }
+    }
+
     private void renderCuePosition(Vector3 dir)
     {
         CueController cue = table.activeCue;
@@ -608,5 +627,21 @@ public class DesktopManager : UdonSharpBehaviour
     public bool _IsShooting()
     {
         return canShoot;
+    }
+    
+    public void _CallShotSetActive(bool show)
+    {
+        callShot.SetActive(show);
+    }
+
+    public void _PushOutSetActive(bool show)
+    {
+        pushOut.SetActive(show);
+    }
+
+    public void _ChangeCallShotPushOut(bool showCallShot)
+    {
+        callShot.SetActive(showCallShot);
+        pushOut.SetActive(!showCallShot);
     }
 }

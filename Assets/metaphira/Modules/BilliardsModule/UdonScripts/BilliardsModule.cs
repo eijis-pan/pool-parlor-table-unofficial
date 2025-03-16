@@ -210,6 +210,7 @@ public class BilliardsModule : UdonSharpBehaviour
     [NonSerialized] public bool teamsLocal;
     [NonSerialized] public bool noGuidelineLocal;
     [NonSerialized] public bool noLockingLocal;
+    [NonSerialized] public bool enablePushOutLocal = true;
     private bool callShotOprationOverwriteModeLocal = true;
     private bool cueBallFixed;
     // private int cueBallRepositionCount = 0;
@@ -263,6 +264,23 @@ public class BilliardsModule : UdonSharpBehaviour
     private float semiAutoCalledTimeBall;
     private bool semiAutoCallTick;
     private readonly float semiAutoCallDelay = 0.2f;
+    [NonSerialized] public byte pushOutStateLocal;
+    [NonSerialized] public readonly byte PUSHOUT_BEFORE_BREAK = 0;
+    [NonSerialized] public readonly byte PUSHOUT_ILLEGAL_REACTIONING = 1;
+    [NonSerialized] public readonly byte PUSHOUT_DONT = 2;
+    [NonSerialized] public readonly byte PUSHOUT_DOING = 3;
+    [NonSerialized] public readonly byte PUSHOUT_REACTIONING = 4;
+    [NonSerialized] public readonly byte PUSHOUT_ENDED = 5;
+#if TKCH_DEBUG_PUSHOUT
+    private string[] PushOutState = new string[] {
+        "BEFORE_BREAK",
+        "ILLEGAL_REACTIONING",
+        "DONT",
+        "DOING",
+        "REACTIONING",
+        "ENDED"
+    }; 
+#endif
 
     // physics simulation data, must be reset before every simulation
     [NonSerialized] public bool isLocalSimulationRunning;
@@ -992,6 +1010,8 @@ public class BilliardsModule : UdonSharpBehaviour
             scoreScreen.DecodeScoreSyncValues(networkingManager.scoreSyncRows);
         }
         
+        onRemotePushOutStateChanged(networkingManager.pushOutStateSynced, stateIdChanged);
+
         // apply state transitions if needed
         onRemoteGameStateChanged(networkingManager.gameStateSynced);
 
@@ -1280,6 +1300,7 @@ public class BilliardsModule : UdonSharpBehaviour
         marker9ball.SetActive(is9Ball);
 
         afterBreak = false;
+        pushOutStateLocal = PUSHOUT_BEFORE_BREAK;
         targetPocketedLocal = 0x0u;
         otherPocketedLocal = 0x0u;
 
@@ -1292,6 +1313,7 @@ public class BilliardsModule : UdonSharpBehaviour
         markerHeadSpot.SetActive(false);
         markerCenterSpot.SetActive(false);
         markerFootSpot.SetActive(false);
+        graphicsManager._UpdatePushOut(pushOutStateLocal);
         requestBreakOrange.SetActive(false);
         requestBreakBlue.SetActive(false);
 
@@ -1549,6 +1571,17 @@ public class BilliardsModule : UdonSharpBehaviour
             }
         }
 
+        if (isRotation)
+        {
+            bool isOurTurnVar = isOurTurn();
+            bool practiceEnable = (isOurTurnVar && isPracticeMode) ||
+                                  (!string.IsNullOrEmpty(tournamentRefereeLocal) && _IsLocalPlayerReferee());
+            if (isOurTurnVar)
+            {
+                this.transform.Find("intl.controls/skipturn").gameObject.SetActive(practiceEnable || (enablePushOutLocal && (pushOutStateLocal == PUSHOUT_REACTIONING)) || (pushOutStateLocal == PUSHOUT_ILLEGAL_REACTIONING));
+            }
+        }
+
         _UpdateNextBallRepositionSpotMarker();
     }
 
@@ -1708,6 +1741,21 @@ public class BilliardsModule : UdonSharpBehaviour
         //     calledBallId = -2;
         //     semiAutoCalledBall = false;
         // }
+    }
+
+    private void onRemotePushOutStateChanged(byte pushOutStateSynced, bool stateIdChanged)
+    {
+        if (!gameLive) return;
+
+        if (pushOutStateLocal == pushOutStateSynced /* && 0 < stateIdLocal */) return;
+
+        _LogInfo($"onRemotePushOutStateChanged pushOutState={pushOutStateSynced}");
+        pushOutStateLocal = pushOutStateSynced;
+        graphicsManager._UpdatePushOut(pushOutStateLocal);
+        if (!stateIdChanged)
+        {
+            aud_main.PlayOneShot(snd_btn);
+        }
     }
     #endregion
 
@@ -1906,6 +1954,35 @@ public class BilliardsModule : UdonSharpBehaviour
 
         auto_colliderBaseVFX.SetActive(false);
 
+        bool pushOut = false;
+        if (!afterBreak)
+        {
+            // if (breakTermsLocal == BREAK_TERMS_3_POINT)
+            // {
+            //     currentPhysicsManager.SetProgramVariable("ballKichenLineOverCheck", false);
+            // }
+            
+            if (pushOutStateLocal == PUSHOUT_BEFORE_BREAK)
+            {
+                pushOutStateLocal = PUSHOUT_DONT;
+            }
+        }
+        else
+        {
+            if (pushOutStateLocal == PUSHOUT_DOING)
+            {
+                pushOut = true;
+                pushOutStateLocal = PUSHOUT_REACTIONING;
+            }
+            else if (pushOutStateLocal == PUSHOUT_DONT || pushOutStateLocal == PUSHOUT_REACTIONING|| pushOutStateLocal == PUSHOUT_ILLEGAL_REACTIONING)
+            {
+#if TKCH_DEBUG_PUSHOUT
+                _LogInfo($"  set ENDED pushOutState {PushOutState[pushOutStateLocal]}({pushOutStateLocal})");
+#endif
+                pushOutStateLocal = PUSHOUT_ENDED;
+            }
+        }
+
         // Make sure we only run this from the client who initiated the move
         if (isLocalSimulationOurs)
         {
@@ -1947,6 +2024,48 @@ public class BilliardsModule : UdonSharpBehaviour
             bool repositionOnFoul = true;
             bool winnerBreak = true;
             bool reBreakAllowed = false;
+            
+            // if (reBreakAllowed)
+            // {
+            //     if (!enableRequestBreakLocal)
+            //     {
+            //         if (breakTermsLocal == BREAK_TERMS_4_CUSHION)
+            //         {
+            //             reBreakAllowed = false;
+            //             isNoTouch = true;
+            //         }
+            //     }
+            //     
+            //     if (breakTermsLocal == BREAK_TERMS_3_POINT)
+            //     {
+            //         pushOutStateLocal = PUSHOUT_ILLEGAL_REACTIONING;
+            //     }
+            // }
+
+            if (pushOut && isScratch)
+            {
+                pushOutStateLocal = PUSHOUT_ENDED;
+            }
+            
+#if TKCH_DEBUG_BREAKING_FOUL
+            if (!afterBreak)
+            {
+                if (breakTermsLocal == BREAK_TERMS_4_CUSHION)
+                {
+                    _LogInfo($"  BREAK_TERMS_4_CUSHION isAnyPocketSink = {isAnyPocketSink}, cushionObjectiveBallsOnBreak = {cushionObjectiveBallsOnBreak:x4} (count {SoftwareFallback(cushionObjectiveBallsOnBreak)})");
+                }
+                else if (breakTermsLocal == BREAK_TERMS_3_POINT)
+                {
+                    _LogInfo($"  BREAK_TERMS_3_POINT kichenLineOverBalls3PointBreak = {kichenLineOverBalls3PointBreak:X4}, ballsPocketedLocal = {ballsPocketedLocal:x4}");
+                    _LogInfo($"               masked kichenLineOverBalls3PointBreak = {(kichenLineOverBalls3PointBreak & pocketMask):X4}, ballsPocketedLocal = {(ballsPocketedLocal & pocketMask):x4}");
+                    _LogInfo($"               calced kichenLineOverBalls3PointBreak = {SoftwareFallback(kichenLineOverBalls3PointBreak & pocketMask)}, ballsPocketedLocal = {SoftwareFallback(ballsPocketedLocal & pocketMask)}");
+                }
+                _LogInfo($"  breakTermsLocal = {breakTermsLocal}, reBreakAllowed = {reBreakAllowed}");
+            }
+#endif
+#if TKCH_DEBUG_PUSHOUT
+            _LogInfo($"  pushOutState {PushOutState[pushOutStateLocal]}({pushOutStateLocal})");
+#endif
 
             if (is8Ball)
             {
@@ -2117,6 +2236,14 @@ public class BilliardsModule : UdonSharpBehaviour
                 winCondition = fbScoresLocal[teamIdLocal] >= 10;
             }
             
+            if (pushOut && !isScratch)
+            {
+                foulCondition = false;
+                winCondition = false;
+                deferLossCondition = false;
+                isObjectiveSink = false;
+            }
+
             afterBreak = true;
             calledBallId = -2;
             calledPocketId = -2;
@@ -2125,7 +2252,7 @@ public class BilliardsModule : UdonSharpBehaviour
             semiAutoCalledTimeBall = 0;
 
             networkingManager._OnSimulationEnded(ballsP, ballsPocketedLocal, targetPocketedLocal, otherPocketedLocal, 
-                fbScoresLocal, totalPointsLocal, chainedPointsLocal, chainedFoulsLocal,
+                fbScoresLocal, pushOutStateLocal, totalPointsLocal, chainedPointsLocal, chainedFoulsLocal,
                 noCushionLocal, inningCountLocal, winRackCountLocal);
 
             if (isRotation && goalPointsLocal <= networkingManager.totalPointsSynced[teamIdLocal])
@@ -2605,26 +2732,29 @@ public class BilliardsModule : UdonSharpBehaviour
     {
         bool isOurTurnVar = isOurTurn();
 
-        if ((isOurTurnVar && isPracticeMode) || (!string.IsNullOrEmpty(tournamentRefereeLocal) && _IsLocalPlayerReferee()))
-        {
-            this.transform.Find("intl.controls/undo").gameObject.SetActive(true);
-            this.transform.Find("intl.controls/redo").gameObject.SetActive(true);
-            this.transform.Find("intl.controls/skipturn").gameObject.SetActive(true);
-        }
+        bool practiceEnable = (isOurTurnVar && isPracticeMode) ||
+                              (!string.IsNullOrEmpty(tournamentRefereeLocal) && _IsLocalPlayerReferee());
+
+        this.transform.Find("intl.controls/undo").gameObject.SetActive(practiceEnable);
+        this.transform.Find("intl.controls/redo").gameObject.SetActive(practiceEnable);
 
         if (is9Ball || isRotation)
         {
-            marker9ball.SetActive(true);
+            marker9ball.SetActive(pushOutStateLocal != PUSHOUT_DOING);
             _Update9BallMarker();
         }
 
         if (isRotation && isOurTurnVar)
         {
             this.transform.Find("intl.controls/callShotLock").gameObject.SetActive(true);
+            this.transform.Find("intl.controls/pushOut").gameObject.SetActive(enablePushOutLocal && (pushOutStateLocal == PUSHOUT_DONT || pushOutStateLocal == PUSHOUT_DOING));
+            this.transform.Find("intl.controls/skipturn").gameObject.SetActive(practiceEnable || (enablePushOutLocal && (pushOutStateLocal == PUSHOUT_REACTIONING)) || (pushOutStateLocal == PUSHOUT_ILLEGAL_REACTIONING));
         }
         else
         {
             this.transform.Find("intl.controls/callShotLock").gameObject.SetActive(false);
+            this.transform.Find("intl.controls/pushOut").gameObject.SetActive(false);
+            this.transform.Find("intl.controls/skipturn").gameObject.SetActive(practiceEnable);
         }
 
         markerCalledBall.SetActive(false);
@@ -2639,6 +2769,24 @@ public class BilliardsModule : UdonSharpBehaviour
         else
         {
             desktopManager._DenyShoot();
+        }
+
+        if (isRotation)
+        {
+            if (!enablePushOutLocal)
+            {
+                desktopManager._ChangeCallShotPushOut(true);
+            }
+            else
+            {
+                bool canPushOut = (pushOutStateLocal == PUSHOUT_DONT || pushOutStateLocal == PUSHOUT_DOING);
+                desktopManager._ChangeCallShotPushOut(!canPushOut);
+            }
+        }
+        else
+        {
+            desktopManager._CallShotSetActive(false);
+            desktopManager._PushOutSetActive(false);
         }
 
         if (timerLocal > 0)
@@ -2660,6 +2808,14 @@ public class BilliardsModule : UdonSharpBehaviour
         {
             onLocalTurnFoul(false, true, true);
         }
+        else if (pushOutStateLocal == PUSHOUT_REACTIONING || pushOutStateLocal == PUSHOUT_ILLEGAL_REACTIONING)
+        {
+#if TKCH_DEBUG_PUSHOUT
+            _LogInfo($"  set {((pushOutStateLocal == PUSHOUT_REACTIONING)? "ENDED" : "DONT")} pushOutState {PushOutState[pushOutStateLocal]}({pushOutStateLocal})");
+#endif
+            networkingManager.pushOutStateSynced = (pushOutStateLocal == PUSHOUT_REACTIONING)? PUSHOUT_ENDED : PUSHOUT_DONT;
+            onLocalTurnFoul(false, isReposition, false);
+        }
     }
 
     public void _CallShotLock()
@@ -2669,6 +2825,11 @@ public class BilliardsModule : UdonSharpBehaviour
         //graphicsManager._UpdatePointPocketMarker(pointPocketsLocal, callShotLockLocal);
     }
     
+    public void _PushOut()
+    {
+        networkingManager._OnPushOutChanged(pushOutStateLocal);
+    }
+
     public void _NextBallOnSpot(float x)
     {
         int target = findLowestUnpocketedBall(ballsPocketedLocal);
@@ -3340,11 +3501,11 @@ public class BilliardsModule : UdonSharpBehaviour
         Array.Copy(fbScoresLocal, scoresClone, fbScoresLocal.Length);
         int[] pointsClone = new int[totalPointsLocal.Length];
         Array.Copy(totalPointsLocal, pointsClone, totalPointsLocal.Length);
-        return new object[19]
+        return new object[20]
         {
             positionClone, ballsPocketedLocal, scoresClone, gameModeLocal, teamIdLocal, repositionStateLocal, isTableOpenLocal, teamColorLocal, fourBallCueBallLocal,
             turnStateLocal, networkingManager.cueBallVSynced, networkingManager.cueBallWSynced, networkingManager.previewWinningTeamSynced, networkingManager.nextBallRepositionStateSynced,
-            targetPocketedLocal, otherPocketedLocal, pointPocketsLocal, calledBallsLocal, pointsClone
+            pushOutStateLocal, targetPocketedLocal, otherPocketedLocal, pointPocketsLocal, calledBallsLocal, pointsClone
         };
     }
 
@@ -3354,7 +3515,7 @@ public class BilliardsModule : UdonSharpBehaviour
             stateIdLocal,
             (Vector3[])state[0], (uint)state[1], (int[])state[2], (uint)state[3], (uint)state[4], (uint)state[5], (bool)state[6], (uint)state[7], (uint)state[8],
             (byte)state[9], (Vector3)state[10], (Vector3)state[11], (byte)state[12], (byte)state[13],
-            (uint)state[14], (uint)state[15], (byte)state[16], (uint)state[17], (int[])state[18]
+            (byte)state[14], (uint)state[15], (uint)state[16], (byte)state[17], (uint)state[18], (int[])state[19]
         );
     }
 

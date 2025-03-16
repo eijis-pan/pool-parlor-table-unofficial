@@ -90,6 +90,8 @@ public class NetworkingManager : UdonSharpBehaviour
 
     [UdonSynced] [NonSerialized] public bool callShotLockSynced;
 
+    [UdonSynced] [NonSerialized] public byte pushOutStateSynced;
+
     // scores if game state is 2 or 3 (4ball)
     [UdonSynced] [NonSerialized] public int[] fourBallScoresSynced = new int[2];
 
@@ -288,6 +290,7 @@ public class NetworkingManager : UdonSharpBehaviour
         // Array.Clear(totalPointsSynced, 0, 2);
         // Array.Clear(chainedPointsSynced, 0, 2);
         // Array.Clear(chainedFoulsSynced, 0, 2);
+        pushOutStateSynced = table.PUSHOUT_BEFORE_BREAK;
         
         targetPocketedSynced = 0;
         otherPocketedSynced = 0;
@@ -310,7 +313,7 @@ public class NetworkingManager : UdonSharpBehaviour
     }
 
     public void _OnSimulationEnded(Vector3[] ballsP, uint ballsPocketed, uint targetPocketed, uint otherPocketed, 
-        int[] fbScores, int[] totalPoints, int[] chainedPoints, int[] chainedFouls,
+        int[] fbScores, byte pushOutState, int[] totalPoints, int[] chainedPoints, int[] chainedFouls,
         bool noCushion, int inningCount, int[] winRackCount)
     {
         Array.Copy(ballsP, ballsPSynced, MAX_BALLS);
@@ -321,6 +324,7 @@ public class NetworkingManager : UdonSharpBehaviour
         ballsPocketedSynced = ballsPocketed;
         targetPocketedSynced = targetPocketed;
         otherPocketedSynced = otherPocketed;
+        pushOutStateSynced = pushOutState;
         noCushionSynced = noCushion;
         inningCountSynced = inningCount;
         Array.Copy(winRackCount, winRackCountSynced, 2);
@@ -464,6 +468,7 @@ public class NetworkingManager : UdonSharpBehaviour
         Array.Clear(chainedPointsSynced, 0, 2);
         Array.Clear(chainedFoulsSynced, 0, 2);
         Array.Clear(winRackCountSynced, 0, 2);
+        pushOutStateSynced = table.PUSHOUT_BEFORE_BREAK;
 
         if (table.isRotation)
         {
@@ -543,6 +548,21 @@ public class NetworkingManager : UdonSharpBehaviour
         bufferMessages(false);
     }
 
+    public void _OnPushOutChanged(byte currentPushOutState)
+    {
+        pushOutStateSynced = (currentPushOutState == table.PUSHOUT_DONT) ? table.PUSHOUT_DOING : 
+            ((currentPushOutState == table.PUSHOUT_DOING) ? table.PUSHOUT_DONT : currentPushOutState);
+
+        if (pushOutStateSynced == table.PUSHOUT_DOING)
+        {
+            calledBallsSynced = 0;
+            pointPocketsSynced = 0;
+            callShotLockSynced = false;
+        }
+
+        bufferMessages(false);
+    }
+
     public void _OnTeamsChanged(bool teamsEnabled)
     {
         teamsSynced = teamsEnabled;
@@ -617,7 +637,7 @@ public class NetworkingManager : UdonSharpBehaviour
     (
         int stateIdLocal,
         Vector3[] newBallsP, uint ballsPocketed, int[] newScores, uint gameMode, uint teamId, uint repositionState, bool isTableOpen, uint teamColor, uint fourBallCueBall,
-        byte turnStateLocal, Vector3 cueBallV, Vector3 cueBallW, byte previewWinningTeam, uint nextBallRepositionState,
+        byte turnStateLocal, Vector3 cueBallV, Vector3 cueBallW, byte previewWinningTeam, uint nextBallRepositionState, byte pushOutState,
         uint targetPocketed, uint otherPocketed, byte pointPockets, uint calledBalls, int[] totalPoints
     )
     {
@@ -644,6 +664,8 @@ public class NetworkingManager : UdonSharpBehaviour
         previewWinningTeamSynced = previewWinningTeam;
         pointPocketsSynced = pointPockets;
         calledBallsSynced = calledBalls;
+        pushOutStateSynced = pushOutState;
+        callShotLockSynced = false;
 
         table.UpdateScoreSyncRowsByParams(teamIdSynced, totalPointsSynced);
 
