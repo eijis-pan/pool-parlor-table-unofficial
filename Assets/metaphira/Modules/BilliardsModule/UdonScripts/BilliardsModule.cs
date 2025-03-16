@@ -1847,8 +1847,6 @@ public class BilliardsModule : UdonSharpBehaviour
                     // aud_main.PlayOneShot(snd_PointMade, 1.0f);
                     // graphicsManager._SpawnOnePocketPoint(pocketLocations[pocketId], true, (int)(teamIdLocal ^ teamColorLocal ^ 0x1U));
                 }
-
-                calledBallsLocal = 0;
             }
             else
             {
@@ -1862,6 +1860,11 @@ public class BilliardsModule : UdonSharpBehaviour
                     otherPocketedLocal |= 1U << id;
                 }
                 graphicsManager._FlashTableError();
+            }
+            
+            if ((calledBallsLocal & (0x1u << id)) != 0)
+            {
+                calledBallsLocal = 0;
             }
         }
         else
