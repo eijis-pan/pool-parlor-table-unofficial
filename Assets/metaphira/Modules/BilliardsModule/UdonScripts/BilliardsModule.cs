@@ -6,7 +6,7 @@
 #define HT8B_DEBUGGER
 #endif
 
-//#define TKCH_DEBUG_IN_KITCHEN
+// #define TKCH_DEBUG_IN_KITCHEN
 // #define TKCH_DEBUG_UPON_FOOT
 //#define TKCH_DEBUG_BREAKING_FOUL
 //#define TKCH_DEBUG_CALLSHOT_DELAY
@@ -2073,10 +2073,12 @@ public class BilliardsModule : UdonSharpBehaviour
                 {
                     chainedPointsLocal[teamIdLocal] = 0;
                 }
- 
+
+                bool cueBallInKitchen = true;
                 chainedFoulsLocal[teamIdLocal] = foulCondition ? chainedFoulsLocal[teamIdLocal] + 1 : 0;
                 if (3 <= chainedFoulsLocal[teamIdLocal])
                 {
+                    cueBallInKitchen = false;
                     if (isScratch) ballsP[0] = Vector3.zero;
                 }
                 if (3 <= chainedFoulsLocal[teamIdLocal ^ 0x1u])
@@ -2090,7 +2092,7 @@ public class BilliardsModule : UdonSharpBehaviour
                     repositionOnFoul = false;
                 }
                 
-                if (isScratch)
+                if (isScratch && cueBallInKitchen)
                 {
                     // next ballがkitchen内の場合はセンターに移動させる
                     checkNextInKitchenThenMoveToCenter();
