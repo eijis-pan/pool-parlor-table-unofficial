@@ -100,6 +100,7 @@ public class BilliardsModule : UdonSharpBehaviour
     private const float k_RANDOMIZE_F = 0.0001f;
     private const float k_SPOT_POSITION_X = 0.5334f; // First X position of the racked balls
     private const float k_SPOT_CAROM_X = 0.8001f; // Spot position for carom mode
+    private const float k_SPOT_RORATION_FREEBALL_X = k_SPOT_CAROM_X - k_SPOT_POSITION_X; // Rotationの完全フリーボールの初期位置はセンターからずらす
     private readonly int[] break_order_8ball = { 9, 2, 10, 11, 1, 3, 4, 12, 5, 13, 14, 6, 15, 7, 8 };
     private readonly int[] break_order_rotation = { 2, 8, 1, 11, 12, 13, 9, 14, 15, 10, 3, 5, 6, 7, 4 };
     private readonly int[] break_order_9ball = { 2, 3, 4, 5, 9, 6, 7, 8, 1 };
@@ -2079,7 +2080,7 @@ public class BilliardsModule : UdonSharpBehaviour
                 if (3 <= chainedFoulsLocal[teamIdLocal])
                 {
                     cueBallInKitchen = false;
-                    if (isScratch) ballsP[0] = Vector3.zero;
+                    if (isScratch) ballsP[0] = new Vector3(-k_SPOT_RORATION_FREEBALL_X, 0.0f, 0.0f); // Rotationの完全フリーボールの初期位置はセンターからずらす
                 }
                 if (3 <= chainedFoulsLocal[teamIdLocal ^ 0x1u])
                 {
