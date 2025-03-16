@@ -264,7 +264,7 @@ public class NetworkingManager : UdonSharpBehaviour
     }
 
     public void _OnGameNextBreak(uint defaultBallsPocketed, Vector3[] ballPositions, 
-        uint breakTeamId, int repositionState)
+        uint breakTeamId, int repositionState, bool forceTurnStateChange)
     {
         stateIdSynced++;
 
@@ -275,7 +275,7 @@ public class NetworkingManager : UdonSharpBehaviour
         ballsPocketedSynced = defaultBallsPocketed;
         repositionStateSynced = (byte)repositionState;
         nextBallRepositionStateSynced = 0;
-        turnStateSynced = 0; // 2
+        turnStateSynced = (byte)(forceTurnStateChange ? 3 : 0); // 2
         // isTableOpenSynced = true;
         teamIdSynced = (byte)breakTeamId;
         fourBallCueBallSynced = 0;

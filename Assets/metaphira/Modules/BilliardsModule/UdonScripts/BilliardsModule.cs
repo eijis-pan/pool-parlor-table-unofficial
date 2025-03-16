@@ -2410,7 +2410,7 @@ public class BilliardsModule : UdonSharpBehaviour
             networkingManager._OnGameNextBreak(
                 initialBallsPocketed[gameModeLocal], initialPositions[gameModeLocal], 
                 (winnerBreak ? winner : winner ^ 0x1U), 
-                (winnerBreak ? 3 : 1));
+                (winnerBreak ? 3 : 1), false);
             return;                
         }
 
@@ -2681,7 +2681,7 @@ public class BilliardsModule : UdonSharpBehaviour
         initializeRack();
         networkingManager._OnGameNextBreak(
             initialBallsPocketed[gameModeLocal], initialPositions[gameModeLocal], 
-            teamId, 1);
+            teamId, 1, true);
     }
 
     public void _CueBallInKitchen()
