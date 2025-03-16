@@ -13,7 +13,8 @@
 //#define TKCH_DEBUG_CALLSHOT_POCKETEDBALL
 //#define TKCH_DEBUG_SCORE
 //#define TKCH_DEBUG_WINRACKCOUNT
-//#define TKCH_DEBUG_SEMIAUTO_CALL
+// #define TKCH_DEBUG_SEMIAUTO_CALL
+// #define TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
 // #define TKCH_DEBUG_NEXTBALL_REPOSITION_STATE
 #define TKCH_CALLSHOT_CALLEDPBALL_DELAY
 #define TKCH_CALLSHOT_CALLEDPOCKET_DELAY
@@ -820,8 +821,9 @@ public class BilliardsModule : UdonSharpBehaviour
             // cueBallRepositionCount++;
             // // semiAutoCalledTimeBall = 0;
             semiAutoCallDelayBase = Networking.GetServerTimeInMilliseconds();
-#if EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
-            _LogInfo($"TKCH EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION semiAutoCallDelayBase = {semiAutoCallDelayBase}, cueBallRepositionCount = {cueBallRepositionCount}");
+#if TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
+            // _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION semiAutoCallDelayBase = {semiAutoCallDelayBase}, cueBallRepositionCount = {cueBallRepositionCount}");
+            _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION semiAutoCallDelayBase = {semiAutoCallDelayBase}");
 #endif
         }
 
@@ -1516,6 +1518,20 @@ public class BilliardsModule : UdonSharpBehaviour
             afterBreak = false;
         }
 
+        if (repositionStateLocal == 0)
+        {
+            if (semiAutoCallBallLocal)
+            {
+                calledBallId = -2;
+                semiAutoCalledTimeBall = 0;
+            }
+            if (semiAutoCallPocketLocal)
+            {
+                calledPocketId = -2;
+                semiAutoCalledPocket = false;
+            }
+        }
+
         if (!isOurTurn() || repositionStateLocal == 0 || repositionStateLocal == 3)
         {
             isReposition = false;
@@ -1596,14 +1612,20 @@ public class BilliardsModule : UdonSharpBehaviour
         Array.Clear(ballsV, 0, ballsV.Length);
         Array.Clear(ballsW, 0, ballsW.Length);
 
-#if EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
-        _LogInfo($"TKCH EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}, cueBallRepositionCount = {cueBallRepositionCount}");
+#if TKCH_DEBUG_SEMIAUTO_CALL
+        _LogInfo($"  nextBallRepositionStateLocal = 0x{nextBallRepositionStateLocal:X02}");
+        _LogInfo($"  semiAutoCalledTimeBall = {semiAutoCalledTimeBall}");
+#endif
+#if TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
+        // _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}, cueBallRepositionCount = {cueBallRepositionCount}");
+        _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}");
 #endif
         // cueBallFixed = !isReposition || (0 < cueBallRepositionCount);
-        cueBallFixed = !isReposition;
+        // cueBallFixed = !isReposition;
         // cueBallFixed = !isReposition && ((nextBallRepositionStateLocal & 0x3u) == 0);
-#if EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
-        _LogInfo($"TKCH EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}");
+        cueBallFixed = true; // afterBreak;
+#if TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
+        _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}");
 #endif
 
         if (isRotation && (afterBreak || !stateIdChanged))
@@ -2845,9 +2867,9 @@ public class BilliardsModule : UdonSharpBehaviour
             networkingManager.pointPocketsSynced = 0;
         }
         
-        nextBallRepositionStateLocal &= ~0x1u;
-        nextBallRepositionStateLocal |= (x == 0 ? 0x10u : 0x08u);
-        networkingManager.nextBallRepositionStateSynced = (byte)nextBallRepositionStateLocal;
+        uint nextBallRepositionState = nextBallRepositionStateLocal & ~0x1u;
+        nextBallRepositionState |= (x == 0 ? 0x10u : 0x08u);
+        networkingManager.nextBallRepositionStateSynced = (byte)nextBallRepositionState;
         networkingManager._OnRepositionBalls(ballsP, false);
     }
 
@@ -3318,8 +3340,8 @@ public class BilliardsModule : UdonSharpBehaviour
             return;
         }
         
-#if EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
-        // if (debugLogFlg) _LogInfo($"TKCH EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}");
+#if TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
+        // if (debugLogFlg) _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}");
 #endif
 
         if (isRotation && gameLive && canPlayLocal && isOurTurn() && afterBreak && cueBallFixed)
@@ -3349,9 +3371,9 @@ public class BilliardsModule : UdonSharpBehaviour
 #if EIJIS_DEBUG_SEMIAUTO_CALL_FINDLOGIC || EIJIS_DEBUG_NEXT_BREAK
             if (debugLogFlg) _LogInfo($"  target(final) = {target}");
 #endif
-#if EIJIS_DEBUG_SEMIAUTO_CALL_FINDLOGIC || EIJIS_DEBUG_SEMIAUTO_CALL_SIDE || EIJIS_DEBUG_NEXT_BREAK || EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
+#if EIJIS_DEBUG_SEMIAUTO_CALL_FINDLOGIC || EIJIS_DEBUG_SEMIAUTO_CALL_SIDE || EIJIS_DEBUG_NEXT_BREAK || TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
             // debugLogFlg = false;
-            debugLogFlg = true;
+            // debugLogFlg = true;
 #endif
             
             if (0 < target)
@@ -3401,8 +3423,8 @@ public class BilliardsModule : UdonSharpBehaviour
                 }
             }
             
-#if EIJIS_DEBUG_SEMIAUTO_CALL_FINDLOGIC || EIJIS_DEBUG_SEMIAUTO_CALL_SIDE || EIJIS_DEBUG_NEXT_BREAK || EIJIS_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
-            debugLogFlg = false;
+#if EIJIS_DEBUG_SEMIAUTO_CALL_FINDLOGIC || EIJIS_DEBUG_SEMIAUTO_CALL_SIDE || EIJIS_DEBUG_NEXT_BREAK || TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
+            // debugLogFlg = false;
 #endif
         }
     }
