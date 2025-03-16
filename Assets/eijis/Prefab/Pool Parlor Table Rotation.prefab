@@ -376,7 +376,7 @@ GameObject:
   - component: {fileID: 202882625}
   - component: {fileID: 202882624}
   m_Layer: 22
-  m_Name: markerFootSpot
+  m_Name: markerCenterSpot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1042,7 +1042,7 @@ GameObject:
   - component: {fileID: 846022032}
   - component: {fileID: 846022031}
   m_Layer: 22
-  m_Name: markerCenterSpot
+  m_Name: markerFootSpot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -5155,7 +5155,7 @@ PrefabInstance:
         type: 3}
       propertyPath: markerFootSpot
       value: 
-      objectReference: {fileID: 202882620}
+      objectReference: {fileID: 846022027}
     - target: {fileID: 6338887527519480172, guid: b28212317aad84e4392cbdb9f1452fbb,
         type: 3}
       propertyPath: markerHeadSpot
@@ -5170,7 +5170,7 @@ PrefabInstance:
         type: 3}
       propertyPath: markerCenterSpot
       value: 
-      objectReference: {fileID: 846022027}
+      objectReference: {fileID: 202882620}
     - target: {fileID: 6338887527519480172, guid: b28212317aad84e4392cbdb9f1452fbb,
         type: 3}
       propertyPath: requestBreakBlue

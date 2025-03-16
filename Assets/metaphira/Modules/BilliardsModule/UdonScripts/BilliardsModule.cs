@@ -7,13 +7,14 @@
 #endif
 
 //#define TKCH_DEBUG_IN_KITCHEN
-//#define TKCH_DEBUG_UPON_FOOT
+// #define TKCH_DEBUG_UPON_FOOT
 //#define TKCH_DEBUG_BREAKING_FOUL
 //#define TKCH_DEBUG_CALLSHOT_DELAY
 //#define TKCH_DEBUG_CALLSHOT_POCKETEDBALL
 //#define TKCH_DEBUG_SCORE
 //#define TKCH_DEBUG_WINRACKCOUNT
 //#define TKCH_DEBUG_SEMIAUTO_CALL
+// #define TKCH_DEBUG_NEXTBALL_REPOSITION_STATE
 #define TKCH_CALLSHOT_CALLEDPBALL_DELAY
 #define TKCH_CALLSHOT_CALLEDPOCKET_DELAY
 
@@ -238,7 +239,7 @@ public class BilliardsModule : UdonSharpBehaviour
     private byte turnStateLocal = byte.MaxValue;
     private int timerStartLocal;
     private uint repositionStateLocal;
-    private uint nextBallRepositionStateLocal;
+    private uint nextBallRepositionStateLocal; // 0x01:的玉の移動選択可能, 0x02:手玉の移動選択可能, 0x04:再ブレイク要求選択可能, 0x08:的玉をフットに移動選択済み, 0x10:的玉をセンターに移動選択済み
     private int tableModelLocal;
     private bool callShotLockLocal;
     private bool calledBallOff = false;
@@ -1527,7 +1528,7 @@ public class BilliardsModule : UdonSharpBehaviour
 
         if (nextBallRepositionStateLocal == nextBallRepositionStateSynced) return;
 
-        _LogInfo($"onRemoteNextBallRepositionStateChanged nextBallRepositionState={nextBallRepositionStateSynced}");
+        _LogInfo($"onRemoteNextBallRepositionStateChanged nextBallRepositionState=0x{nextBallRepositionStateSynced:X02}");
         nextBallRepositionStateLocal = nextBallRepositionStateSynced;
 
         if (semiAutoCallBallLocal || semiAutoCallPocketLocal)
@@ -2677,7 +2678,9 @@ public class BilliardsModule : UdonSharpBehaviour
             networkingManager.pointPocketsSynced = 0;
         }
         
-        networkingManager.nextBallRepositionStateSynced = (byte)(nextBallRepositionStateLocal & ~0x1u);
+        nextBallRepositionStateLocal &= ~0x1u;
+        nextBallRepositionStateLocal |= (x == 0 ? 0x10u : 0x08u);
+        networkingManager.nextBallRepositionStateSynced = (byte)nextBallRepositionStateLocal;
         networkingManager._OnRepositionBalls(ballsP, false);
     }
 
@@ -2701,8 +2704,29 @@ public class BilliardsModule : UdonSharpBehaviour
 
     public void _CueBallInKitchen()
     {
+#if TKCH_DEBUG_NEXTBALL_REPOSITION_STATE
+        _LogInfo("TKCH BilliardsModule::_CueBallInKitchen()");
+#endif
         // next ballがkitchen内の場合はセンターに移動させる
         checkNextInKitchenThenMoveToCenter();
+        
+        ballsP[0] = initialPositions[gameModeLocal][0];
+#if TKCH_DEBUG_NEXTBALL_REPOSITION_STATE
+        _LogInfo($"  nextBallRepositionStateLocal = 0x{nextBallRepositionStateLocal:X02}");
+#endif
+        // 的玉移動 → 手玉かぶりでずらして配置 → 手玉選択 の場合にずれたままになるのを回避
+        if ((nextBallRepositionStateLocal & (0x08u | 0x10u)) > 0 )
+        {
+            int target = findLowestUnpocketedBall(ballsPocketedLocal);
+#if TKCH_DEBUG_NEXTBALL_REPOSITION_STATE
+            _LogInfo($"  target = {target}");
+#endif
+            float x = ((nextBallRepositionStateLocal & 0x08u) > 0 ? markerFootSpot.transform.localPosition.x : 0);
+#if TKCH_DEBUG_NEXTBALL_REPOSITION_STATE
+            _LogInfo($"  x = {x}");
+#endif
+            pocketedballUponPool(0x1u << target, x, break_order_rotation.Length);
+        }
         
         if (semiAutoCallBallLocal)
         {
@@ -2713,7 +2737,6 @@ public class BilliardsModule : UdonSharpBehaviour
             networkingManager.pointPocketsSynced = 0;
         }
 
-        ballsP[0] = initialPositions[gameModeLocal][0];
         networkingManager.repositionStateSynced = 2; // 1
         networkingManager.nextBallRepositionStateSynced = (byte)(nextBallRepositionStateLocal & ~0x2u);
         networkingManager._OnRepositionBalls(ballsP, false);
