@@ -255,8 +255,11 @@ public class BilliardsModule : UdonSharpBehaviour
     private int calledPocketId = -2;
     private float calledPocketIdDelayTimestamp = 0;
 #endif
-    private bool semiAutoCalledBall;
+    // private bool semiAutoCalledBall;
     private bool semiAutoCalledPocket;
+    private float semiAutoCalledTimeBall;
+    private bool semiAutoCallTick;
+    private readonly float semiAutoCallDelay = 0.2f;
 
     // physics simulation data, must be reset before every simulation
     [NonSerialized] public bool isLocalSimulationRunning;
@@ -1019,6 +1022,8 @@ public class BilliardsModule : UdonSharpBehaviour
         stateIdLocal = networkingManager.stateIdSynced;
 
         redrawDebugger();
+        
+        semiAutoCallTick = (semiAutoCallBallLocal || semiAutoCallPocketLocal);
     }
 
     private void onRemoteGlobalSettingsUpdated(string tournamentRefereeSynced, byte physicsModeSynced, byte tableModelSynced, byte tableSkinSynced)
@@ -1521,6 +1526,23 @@ public class BilliardsModule : UdonSharpBehaviour
 
         _LogInfo($"onRemoteNextBallRepositionStateChanged nextBallRepositionState={nextBallRepositionStateSynced}");
         nextBallRepositionStateLocal = nextBallRepositionStateSynced;
+
+        if (semiAutoCallBallLocal || semiAutoCallPocketLocal)
+        {
+            if ((nextBallRepositionStateLocal & 0x1u) == 0 /* || (nextBallRepositionStateLocal & 0x2u) == 0 */ )
+            {
+                if (semiAutoCallBallLocal)
+                {
+                    calledBallId = -2;
+                    semiAutoCalledTimeBall = 0;
+                }
+                if (semiAutoCallPocketLocal)
+                {
+                    calledPocketId = -2;
+                    semiAutoCalledPocket = false;
+                }
+            }
+        }
 
         _UpdateNextBallRepositionSpotMarker();
     }
@@ -2078,8 +2100,9 @@ public class BilliardsModule : UdonSharpBehaviour
             afterBreak = true;
             calledBallId = -2;
             calledPocketId = -2;
-            semiAutoCalledBall = false;
+            // semiAutoCalledBall = false;
             semiAutoCalledPocket = false;
+            semiAutoCalledTimeBall = 0;
 
             networkingManager._OnSimulationEnded(ballsP, ballsPocketedLocal, targetPocketedLocal, otherPocketedLocal, 
                 fbScoresLocal, totalPointsLocal, chainedPointsLocal, chainedFoulsLocal,
@@ -2130,9 +2153,12 @@ public class BilliardsModule : UdonSharpBehaviour
             afterBreak = true;
             calledBallId = -2;
             calledPocketId = -2;
-            semiAutoCalledBall = false;
+            // semiAutoCalledBall = false;
             semiAutoCalledPocket = false;
+            semiAutoCalledTimeBall = 0;
         }
+        
+        // cueBallRepositionCount = 0;
     }
     #endregion
 
@@ -2487,6 +2513,7 @@ public class BilliardsModule : UdonSharpBehaviour
     private void onLocalTimerEnd()
     {
         timerRunning = false;
+        semiAutoCallTick = false;
 
         _LogWarn("out of time!");
 
@@ -2497,6 +2524,11 @@ public class BilliardsModule : UdonSharpBehaviour
             // no one is allowed to play
             canPlayLocal = false;
 
+            calledBallId = -2;
+            calledPocketId = -2;
+            semiAutoCalledPocket = false;
+            semiAutoCalledTimeBall = 0;
+        
             if (isOurTurn())
             {
                 bool reposition = true;
@@ -2596,6 +2628,12 @@ public class BilliardsModule : UdonSharpBehaviour
 
     public void _SkipTurn()
     {
+        calledBallId = -2;
+        calledPocketId = -2;
+        semiAutoCallTick = false;
+        semiAutoCalledPocket = false;
+        semiAutoCalledTimeBall = 0;
+        
         if (isPracticeMode || (!string.IsNullOrEmpty(tournamentRefereeLocal) && _IsLocalPlayerReferee()))
         {
             onLocalTurnFoul(false, true, true);
@@ -2614,6 +2652,15 @@ public class BilliardsModule : UdonSharpBehaviour
         int target = findLowestUnpocketedBall(ballsPocketedLocal);
         //ballsP[target] = new Vector3(x, 0.0f, 0.0f);
         pocketedballUponPool(0x1u << target, x, break_order_rotation.Length);
+
+        if (semiAutoCallBallLocal)
+        {
+            networkingManager.calledBallsSynced = 0;
+        }
+        if (semiAutoCallPocketLocal)
+        {
+            networkingManager.pointPocketsSynced = 0;
+        }
         
         networkingManager.nextBallRepositionStateSynced = (byte)(nextBallRepositionStateLocal & ~0x1u);
         networkingManager._OnRepositionBalls(ballsP, false);
@@ -2642,6 +2689,15 @@ public class BilliardsModule : UdonSharpBehaviour
         // next ballがkitchen内の場合はセンターに移動させる
         checkNextInKitchenThenMoveToCenter();
         
+        if (semiAutoCallBallLocal)
+        {
+            networkingManager.calledBallsSynced = 0;
+        }
+        if (semiAutoCallPocketLocal)
+        {
+            networkingManager.pointPocketsSynced = 0;
+        }
+
         ballsP[0] = initialPositions[gameModeLocal][0];
         networkingManager.repositionStateSynced = 2; // 1
         networkingManager.nextBallRepositionStateSynced = (byte)(nextBallRepositionStateLocal & ~0x2u);
@@ -3037,44 +3093,6 @@ public class BilliardsModule : UdonSharpBehaviour
                 onLocalTimerEnd();
             }
         }
-
-        /*
-        if (isRotation && gameLive && canPlayLocal && afterBreak)
-        {
-            int target = findLowestUnpocketedBall(ballsPocketedLocal);
-            if (0 < target)
-            {
-                // bool isDesktopUser = ReferenceEquals(null, Networking.LocalPlayer) ? false : !Networking.LocalPlayer.IsUserInVR();
-                float elapsedSeconds = (Networking.GetServerTimeInMilliseconds() - timerStartLocal) / 1000.0f;
-                
-#if TKCH_DEBUG_SEMIAUTO_CALL
-                if (0.1f < elapsedSeconds && elapsedSeconds < 0.12f)
-                {
-                    _LogInfo($"  semiAutoCalledBall = {semiAutoCalledBall}, calledBallId = {calledBallId}, target = {target}");
-                }
-#endif
-
-                if (semiAutoCallBallLocal && !semiAutoCalledBall && calledBallId < 0)
-                {
-                    if (0.4f < elapsedSeconds)
-                    {
-                        _TriggerOtherBallHit(target, true);
-                        semiAutoCalledBall = true;
-                    }
-                }
-            
-                if (semiAutoCallPocketLocal && !semiAutoCalledPocket && calledPocketId < 0)
-                {
-                    if (0.8f < elapsedSeconds)
-                    {
-                        int pocketId = findNearestPocketFromBall(target);
-                        _TriggerPocketHit(pocketId, true);
-                        semiAutoCalledPocket = true;
-                    }
-                }
-            }
-        }
-        */
     }
 
     private void tickSemiAutoCall()
