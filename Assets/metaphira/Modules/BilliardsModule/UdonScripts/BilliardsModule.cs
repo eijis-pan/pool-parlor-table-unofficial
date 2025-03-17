@@ -2243,6 +2243,14 @@ public class BilliardsModule : UdonSharpBehaviour
                     checkNextInKitchenThenMoveToCenter();
                 }
                 
+                if (!foulCondition && !isObjectiveSink && 0 < pointPocketsLocal && 0 < calledBallsLocal)
+                {
+                    if (pushOutStateLocal == PUSHOUT_ENDED)
+                    {
+                        pushOutStateLocal = PUSHOUT_REACTIONING;
+                    }
+                }
+
                 if (!afterBreak && 0 < point)
                 {
                     isObjectiveSink = true;
