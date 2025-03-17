@@ -2314,7 +2314,7 @@ public class BilliardsModule : UdonSharpBehaviour
             else
             {
                 // Pass
-                onLocalTurnPass(reBreakAllowed);
+                onLocalTurnPass(reBreakAllowed, false);
             }
         }
         else
@@ -2595,7 +2595,7 @@ public class BilliardsModule : UdonSharpBehaviour
         }
     }
 
-    private void onLocalTurnPass(bool reBreakAllowed)
+    private void onLocalTurnPass(bool reBreakAllowed, bool skipTurn)
     {
         _LogInfo($"onLocalTurnPass");
 
@@ -2604,7 +2604,7 @@ public class BilliardsModule : UdonSharpBehaviour
             networkingManager.inningCountSynced++;
         }
 
-        networkingManager._OnTurnPass(teamIdLocal ^ 0x1u, reBreakAllowed);
+        networkingManager._OnTurnPass(teamIdLocal ^ 0x1u, reBreakAllowed, skipTurn);
     }
 
     private void onLocalTurnFoul(bool isTimeEnd, bool reposition, bool reBreakAllowed)
@@ -2828,7 +2828,7 @@ public class BilliardsModule : UdonSharpBehaviour
         
         if (isPracticeMode || (!string.IsNullOrEmpty(tournamentRefereeLocal) && _IsLocalPlayerReferee()))
         {
-            onLocalTurnFoul(false, true, true);
+            onLocalTurnFoul(false, true, false);
         }
         else if (pushOutStateLocal == PUSHOUT_REACTIONING || pushOutStateLocal == PUSHOUT_ILLEGAL_REACTIONING)
         {
@@ -2836,7 +2836,7 @@ public class BilliardsModule : UdonSharpBehaviour
             _LogInfo($"  set {((pushOutStateLocal == PUSHOUT_REACTIONING)? "ENDED" : "DONT")} pushOutState {PushOutState[pushOutStateLocal]}({pushOutStateLocal})");
 #endif
             networkingManager.pushOutStateSynced = (pushOutStateLocal == PUSHOUT_REACTIONING)? PUSHOUT_ENDED : PUSHOUT_DONT;
-            onLocalTurnFoul(false, isReposition, false);
+            onLocalTurnPass(false, true);
         }
     }
 

@@ -332,12 +332,12 @@ public class NetworkingManager : UdonSharpBehaviour
         bufferMessages(false);
     }
 
-    public void _OnTurnPass(uint teamId, bool reBreakAllowed)
+    public void _OnTurnPass(uint teamId, bool reBreakAllowed, bool skipTurn)
     {
         stateIdSynced++;
 
         teamIdSynced = (byte)teamId;
-        turnStateSynced = 0;
+        turnStateSynced = (byte)(skipTurn ? 2 : 0);
         timerStartSynced = Networking.GetServerTimeInMilliseconds();
         swapFourBallCueBalls();
         calledBallsSynced = 0;
