@@ -6,6 +6,7 @@
 #define HT8B_DEBUGGER
 #endif
 
+#define TKCH_LOG_PREFIX_COLOR_OFF
 // #define TKCH_DEBUG_IN_KITCHEN
 // #define TKCH_DEBUG_UPON_FOOT
 //#define TKCH_DEBUG_BREAKING_FOUL
@@ -3928,10 +3929,41 @@ public void _RedrawDebugger() { }
         perfTimings[id] += Time.realtimeSinceStartup - perfStart[id];
         perfCounters[id]++;
     }
+#if TKCH_LOG_PREFIX_COLOR_OFF
+
+    private string stripTag(string source)
+    {
+        int searchStartPos = 0;
+        string work = source;
+        bool tagFound = false;
+        do
+        {
+            tagFound = false;
+            int braceStartIndex = work.IndexOf('<', searchStartPos);
+            if (0 <= braceStartIndex && braceStartIndex + 1 < work.Length)
+            {
+                int braceEndIndex = work.IndexOf('>', braceStartIndex + 1);
+                if (0 <= braceEndIndex)
+                {
+                    work = work.Substring(0, braceStartIndex) +
+                           work.Substring(braceEndIndex + 1);
+                    searchStartPos = braceStartIndex;
+                    tagFound = true;
+                }
+            }
+        } while (tagFound);
+
+        return work;
+    }
+#endif
 
     private void _log(string ln)
     {
+#if TKCH_LOG_PREFIX_COLOR_OFF
+        Debug.Log("[BilliardsModule" + logLabel + "] " + stripTag(ln));
+#else
         Debug.Log("[<color=\"#B5438F\">BilliardsModule</color>" + logLabel + "] " + ln);
+#endif
 
         LOG_LINES[LOG_PTR++] = "[<color=\"#B5438F\">BilliardsModule" + logLabel + "</color>] " + ln + "\n";
         LOG_LEN++;
