@@ -825,6 +825,17 @@ public class BilliardsModule : UdonSharpBehaviour
             // _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION semiAutoCallDelayBase = {semiAutoCallDelayBase}, cueBallRepositionCount = {cueBallRepositionCount}");
             _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION semiAutoCallDelayBase = {semiAutoCallDelayBase}");
 #endif
+            if (repositionStateLocal == 1 || repositionStateLocal == 2)
+            {
+                if (semiAutoCallBallLocal)
+                {
+                    networkingManager.calledBallsSynced = 0;
+                }
+                if (semiAutoCallPocketLocal)
+                {
+                    networkingManager.pointPocketsSynced = 0;
+                }
+            }
         }
 
         networkingManager._OnRepositionBalls(ballsP, consumeReposition);
