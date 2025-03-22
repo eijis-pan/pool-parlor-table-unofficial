@@ -108,6 +108,12 @@ public class BilliardsModule : UdonSharpBehaviour
     private readonly int[] break_order_9ball = { 2, 3, 4, 5, 9, 6, 7, 8, 1 };
     private readonly int[] break_rows_9ball = { 0, 1, 2, 1, 0 };
     private readonly uint rotation_pocket_mask = 0xFFFEu;
+#if TKCH_DEBUG_SEMIAUTO_CALL_FINDLOGIC || TKCH_DEBUG_SEMIAUTO_CALL_SIDE ||TKCH_DEBUG_NEXT_BREAK
+    private bool debugLogFlg = false;
+#endif
+#if TKCH_DEBUG_SEMIAUTO_CALL
+    private bool debugFlg = false;
+#endif
 
     #region InspectorValues
     [Header("Debug")]
@@ -806,6 +812,9 @@ public class BilliardsModule : UdonSharpBehaviour
 
     public void _TriggerPlaceBall(int idx)
     {
+#if TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
+        _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION BilliardsModule::_TriggerPlaceBall(idx = {idx})");
+#endif
         if (!canPlayLocal) return; // in case player was forced to drop ball since someone else took the shot
 
         // practiceManager._Record();
@@ -823,8 +832,8 @@ public class BilliardsModule : UdonSharpBehaviour
             // // semiAutoCalledTimeBall = 0;
             semiAutoCallDelayBase = Networking.GetServerTimeInMilliseconds();
 #if TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
-            // _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION semiAutoCallDelayBase = {semiAutoCallDelayBase}, cueBallRepositionCount = {cueBallRepositionCount}");
-            _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION semiAutoCallDelayBase = {semiAutoCallDelayBase}");
+            // // _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION semiAutoCallDelayBase = {semiAutoCallDelayBase}, cueBallRepositionCount = {cueBallRepositionCount}");
+            // _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION semiAutoCallDelayBase = {semiAutoCallDelayBase}");
 #endif
             if (repositionStateLocal == 1 || repositionStateLocal == 2)
             {
@@ -970,6 +979,11 @@ public class BilliardsModule : UdonSharpBehaviour
 #if TKCH_DEBUG_WINRACKCOUNT
         _LogInfo($"  networkingManager.winRackCountSynced = {networkingManager.winRackCountSynced[0]}-{networkingManager.winRackCountSynced[1]}");
 #endif
+#if TKCH_DEBUG_SEMIAUTO_CALL
+        _LogInfo($"TKCH SEMIAUTO_CALL                    semiAutoCalledTimeBall = {semiAutoCalledTimeBall}, calledBallId = {calledBallId}");
+        // _LogInfo($"  semiAutoCall = {semiAutoCallLocal}, semiAutoCalledPocket = {semiAutoCalledPocket}, calledPocketId = {calledPocketId}, calledBalls = {calledBallsLocal:X4}");
+        _LogInfo($"  semiAutoCalledPocket = {semiAutoCalledPocket}, calledPocketId = {calledPocketId}, calledBalls = {calledBallsLocal:X4}");
+#endif
 
         // propagate game settings first
         onRemoteGlobalSettingsUpdated(
@@ -1061,6 +1075,11 @@ public class BilliardsModule : UdonSharpBehaviour
 
         redrawDebugger();
         
+#if TKCH_DEBUG_SEMIAUTO_CALL
+        _LogInfo($"TKCH SEMIAUTO_CALL *                  semiAutoCalledTimeBall = {semiAutoCalledTimeBall}, calledBallId = {calledBallId}");
+        // _LogInfo($"  semiAutoCall = {semiAutoCallLocal}, semiAutoCalledPocket = {semiAutoCalledPocket}, calledPocketId = {calledPocketId}, calledBalls = {calledBallsLocal:X4}");
+        _LogInfo($"  semiAutoCalledPocket = {semiAutoCalledPocket}, calledPocketId = {calledPocketId}, calledBalls = {calledBallsLocal:X4}");
+#endif
         semiAutoCallTick = (semiAutoCallBallLocal || semiAutoCallPocketLocal);
     }
 
@@ -1629,15 +1648,15 @@ public class BilliardsModule : UdonSharpBehaviour
         _LogInfo($"  semiAutoCalledTimeBall = {semiAutoCalledTimeBall}");
 #endif
 #if TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
-        // _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}, cueBallRepositionCount = {cueBallRepositionCount}");
-        _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}");
+        // // _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}, cueBallRepositionCount = {cueBallRepositionCount}");
+        // _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}");
 #endif
         // cueBallFixed = !isReposition || (0 < cueBallRepositionCount);
         // cueBallFixed = !isReposition;
         // cueBallFixed = !isReposition && ((nextBallRepositionStateLocal & 0x3u) == 0);
         cueBallFixed = true; // afterBreak;
 #if TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
-        _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}");
+        // _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}");
 #endif
 
         if (isRotation && (afterBreak || !stateIdChanged))
