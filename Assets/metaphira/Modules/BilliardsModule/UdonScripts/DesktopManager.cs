@@ -1,4 +1,5 @@
-﻿
+﻿// #define EIJIS_DEBUG_BALLORDER
+
 using System;
 using Metaphira.Modules.CameraOverride;
 using UdonSharp;
@@ -244,7 +245,6 @@ public class DesktopManager : UdonSharpBehaviour
                 updateSpinIndicator();
                 updateJumpIndicator();
                 updateCallShotIndicator();
-                updateCallShotIndicator();
                 if (table.enablePushOutLocal) updatePushOutIndicator();
             }
         }
@@ -393,7 +393,7 @@ public class DesktopManager : UdonSharpBehaviour
 #if EIJIS_DEBUG_BALLORDER
         table._LogInfo($"DesktopManager::nextBallOrder(asc = {asc})");
 #endif
-        int id = 0;
+        int id = -1;
         uint calledBalls = table.calledBallsLocal;
         for (int i = 1; i < table.ballsP.Length; i++)
         {
@@ -406,10 +406,11 @@ public class DesktopManager : UdonSharpBehaviour
 #if EIJIS_DEBUG_BALLORDER
         table._LogInfo($"  before called ball id = {id}");
 #endif
+        int orig = id;
 
         uint ballsPocketed = table.ballsPocketedLocal;
-        float before_x = table.ballsP[id].x;
-        float before_z = table.ballsP[id].z;
+        float before_x = 0 <= id ? table.ballsP[id].x : (asc ? float.MinValue : float.MaxValue);
+        float before_z = 0 <= id ? table.ballsP[id].z : (asc ? float.MinValue : float.MaxValue);
         float nearest_x = asc ? float.MaxValue : float.MinValue;
         float nearest_z = asc ? float.MaxValue : float.MinValue;
         int farestId = 0;
@@ -430,7 +431,7 @@ public class DesktopManager : UdonSharpBehaviour
             float current_x = table.ballsP[i].x;
             float current_z = table.ballsP[i].z;
 #if EIJIS_DEBUG_BALLORDER
-            // table._LogInfo($"  before_x = {before_x}, current_x = {current_x}");
+            table._LogInfo($"  before_x = {before_x}, current_x = {current_x}");
 #endif
             if ((asc && before_x < current_x) || (!asc && before_x > current_x))
             {
@@ -439,13 +440,13 @@ public class DesktopManager : UdonSharpBehaviour
                     nearest_x = current_x;
                     id = i;
 #if EIJIS_DEBUG_BALLORDER
-                    // table._LogInfo($"  found ball by x id = {id}");
+                    table._LogInfo($"  found ball by x id = {id}");
 #endif
                 }
                 else if (current_x == nearest_x)
                 {
 #if EIJIS_DEBUG_BALLORDER
-                    // table._LogInfo($"  before_z = {before_z}, current_z = {current_z}");
+                    table._LogInfo($"  before_z = {before_z}, current_z = {current_z}");
 #endif
                     if ((asc && before_z < current_z) || (!asc && before_z > current_z))
                     {
@@ -454,7 +455,7 @@ public class DesktopManager : UdonSharpBehaviour
                             nearest_z = current_z;
                             id = i;
 #if EIJIS_DEBUG_BALLORDER
-                            // table._LogInfo($"  found ball by z id = {id}");
+                            table._LogInfo($"  found ball by z id = {id}");
 #endif
                         }
                     }
@@ -494,7 +495,8 @@ public class DesktopManager : UdonSharpBehaviour
 #endif
         if (nearest_x == float.MaxValue || nearest_x == float.MinValue)
         {
-            id = farestId;
+            // id = farestId;
+            id = orig;
         }
 
         return id;
