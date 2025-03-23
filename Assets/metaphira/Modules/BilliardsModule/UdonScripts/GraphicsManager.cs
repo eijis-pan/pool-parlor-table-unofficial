@@ -53,6 +53,7 @@ public class GraphicsManager : UdonSharpBehaviour
 
     private Color gripColorActive = new Color(0.0f, 0.5f, 1.1f, 1.0f);
     private Color gripColorInactive = new Color(0.34f, 0.34f, 0.34f, 1.0f);
+    private Color gripColorCalled = new Color(0.0f, 1.0f, 0.0f, 1.0f);
 
     private BilliardsModule table;
 
@@ -596,17 +597,26 @@ int uniform_cue_colour;
         else if (table.is9Ball) updateNineBallCues();
         else if (table.is8Ball || table.isRotation) updateEightBallCues(idsrc);
 
+        _UpdateCueGrip();
+    }
+
+    public void _UpdateCueGrip()
+    {
+        Color activeCueGripColor = (table.calledBallsLocal != 0 && table.pointPocketsLocal != 0)
+            ? gripColorCalled
+            : gripColorActive;
+
         if (table.isPracticeMode)
         {
-            cuePrimaryGripRenderers[0].material.SetColor(uniform_marker_colour, gripColorActive);
-            cueSecondaryGripRenderers[0].material.SetColor(uniform_marker_colour, gripColorActive);
+            cuePrimaryGripRenderers[0].material.SetColor(uniform_marker_colour, activeCueGripColor);
+            cueSecondaryGripRenderers[0].material.SetColor(uniform_marker_colour, activeCueGripColor);
         }
         else
         {
             if (table.teamIdLocal == 0)
             {
-                cuePrimaryGripRenderers[0].material.SetColor(uniform_marker_colour, gripColorActive);
-                cueSecondaryGripRenderers[0].material.SetColor(uniform_marker_colour, gripColorActive);
+                cuePrimaryGripRenderers[0].material.SetColor(uniform_marker_colour, activeCueGripColor);
+                cueSecondaryGripRenderers[0].material.SetColor(uniform_marker_colour, activeCueGripColor);
                 cuePrimaryGripRenderers[1].material.SetColor(uniform_marker_colour, gripColorInactive);
                 cueSecondaryGripRenderers[1].material.SetColor(uniform_marker_colour, gripColorInactive);
             }
@@ -614,8 +624,8 @@ int uniform_cue_colour;
             {
                 cuePrimaryGripRenderers[0].material.SetColor(uniform_marker_colour, gripColorInactive);
                 cueSecondaryGripRenderers[0].material.SetColor(uniform_marker_colour, gripColorInactive);
-                cuePrimaryGripRenderers[1].material.SetColor(uniform_marker_colour, gripColorActive);
-                cueSecondaryGripRenderers[1].material.SetColor(uniform_marker_colour, gripColorActive);
+                cuePrimaryGripRenderers[1].material.SetColor(uniform_marker_colour, activeCueGripColor);
+                cueSecondaryGripRenderers[1].material.SetColor(uniform_marker_colour, activeCueGripColor);
             }
         }
     }

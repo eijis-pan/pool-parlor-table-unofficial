@@ -1082,6 +1082,7 @@ public class BilliardsModule : UdonSharpBehaviour
             stateIdChanged);
         onRemoteCalledBallsChanged(networkingManager.calledBallsSynced, stateIdChanged);
         onRemoteNextBallRepositionStateChanged(networkingManager.nextBallRepositionStateSynced);
+        graphicsManager._UpdateCueGrip();
 
         Array.Copy(networkingManager.totalPointsSynced, totalPointsLocal, totalPointsLocal.Length);
         Array.Copy(networkingManager.chainedPointsSynced, chainedPointsLocal, chainedPointsLocal.Length);
