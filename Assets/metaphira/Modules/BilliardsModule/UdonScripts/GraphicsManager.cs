@@ -67,6 +67,7 @@ public class GraphicsManager : UdonSharpBehaviour
     private float[] cushionTouchTime;
 
     private float introAnimationTime = 0.0f;
+    private uint introAnimationBalls = 0xFFFFu;
 
     private uint ANDROID_UNIFORM_CLOCK = 0x00u;
     private uint ANDROID_CLOCK_DIVIDER = 0x8u;
@@ -261,11 +262,11 @@ public class GraphicsManager : UdonSharpBehaviour
             introAnimationTime = 0.0f;
 
         // Cueball drops late
-        tickIntroBall(table.balls[0].transform, 0.33f);
+        if ((introAnimationBalls & 0x1u) != 0) tickIntroBall(table.balls[0].transform, 0.33f);
 
         for (int i = 1; i < 16; i++)
         {
-            tickIntroBall(table.balls[i].transform, 0.84f + i * 0.03f);
+            if ((introAnimationBalls & (0x1u << i)) != 0) tickIntroBall(table.balls[i].transform, 0.84f + i * 0.03f);
         }
     }
 
@@ -456,9 +457,10 @@ public class GraphicsManager : UdonSharpBehaviour
         scorecardHolder.SetActive(false);
     }
 
-    public void _PlayIntroAnimation()
+    public void _PlayIntroAnimation(uint balls)
     {
         introAnimationTime = 2.0f;
+        introAnimationBalls = balls;
     }
 
     public void _SpawnFourBallPoint(Vector3 pos, bool plus)

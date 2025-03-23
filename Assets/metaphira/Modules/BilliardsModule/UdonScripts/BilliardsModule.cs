@@ -1388,7 +1388,7 @@ public class BilliardsModule : UdonSharpBehaviour
         requestBreakBlue.SetActive(false);
 
         // Effects
-        graphicsManager._PlayIntroAnimation();
+        graphicsManager._PlayIntroAnimation((isRotation && networkingManager.repositionStateSynced == 3)? rotation_pocket_mask : 0xFFFFu);
         aud_main.PlayOneShot(snd_Intro, 1.0f);
 
         graphicsManager._SetScorecardPlayers(playerNamesLocal);
