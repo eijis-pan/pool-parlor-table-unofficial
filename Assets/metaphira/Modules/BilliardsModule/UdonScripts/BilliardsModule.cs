@@ -212,8 +212,10 @@ public class BilliardsModule : UdonSharpBehaviour
     [NonSerialized] public uint gameModeLocal;
     [NonSerialized] public int goalPointsLocal = 120;
     [NonSerialized] public uint rackConditionLocal = 1;
-    [NonSerialized] public bool semiAutoCallBallLocal;
-    [NonSerialized] public bool semiAutoCallPocketLocal;
+    // [NonSerialized] public bool semiAutoCallBallLocal;
+    // [NonSerialized] public bool semiAutoCallPocketLocal;
+    [NonSerialized] public bool semiAutoCallLocal;
+    [NonSerialized] public bool callPassOptionLocal;
     [NonSerialized] public uint timerLocal;
     [NonSerialized] public bool teamsLocal;
     [NonSerialized] public bool noGuidelineLocal;
@@ -384,16 +386,20 @@ public class BilliardsModule : UdonSharpBehaviour
         gameModeLocal = 4;
         isRotation = true;
         rackConditionLocal = 1;
-        semiAutoCallBallLocal = true;
-        semiAutoCallPocketLocal = true;
+        // semiAutoCallBallLocal = true;
+        // semiAutoCallPocketLocal = true;
+        semiAutoCallLocal = true;
+        callPassOptionLocal = false;
         pointPocketsLocal = 0;
         calledBallsLocal = 0;
         
         networkingManager._Init(this);
         networkingManager.gameModeSynced = (byte)gameModeLocal;
         networkingManager.rackConditionSynced = (byte)rackConditionLocal;
-        networkingManager.semiAutoCallBallSynced = semiAutoCallBallLocal;
-        networkingManager.semiAutoCallPocketSynced = semiAutoCallPocketLocal;
+        // networkingManager.semiAutoCallBallSynced = semiAutoCallBallLocal;
+        // networkingManager.semiAutoCallPocketSynced = semiAutoCallPocketLocal;
+        networkingManager.semiAutoCallSynced = semiAutoCallLocal;
+        networkingManager.callPassOptionSynced = callPassOptionLocal;
         networkingManager.pointPocketsSynced = pointPocketsLocal;
         networkingManager.calledBallsSynced = calledBallsLocal;
 
@@ -551,14 +557,24 @@ public class BilliardsModule : UdonSharpBehaviour
         networkingManager._OnRackCondisionChanged(rackCondition);
     }
 
-    public void _TriggerSemiAutoCallBallChanged(bool semiAutoCallBallEnabled)
+    // public void _TriggerSemiAutoCallBallChanged(bool semiAutoCallBallEnabled)
+    // {
+    //     networkingManager._OnSemiAutoCallBallChanged(semiAutoCallBallEnabled);
+    // }
+    //
+    // public void _TriggerSemiAutoCallPocketChanged(bool semiAutoCallPocketEnabled)
+    // {
+    //     networkingManager._OnSemiAutoCallPocketChanged(semiAutoCallPocketEnabled);
+    // }
+
+    public void _TriggerSemiAutoCallChanged(bool semiAutoCallEnabled)
     {
-        networkingManager._OnSemiAutoCallBallChanged(semiAutoCallBallEnabled);
+        networkingManager._OnSemiAutoCallChanged(semiAutoCallEnabled);
     }
 
-    public void _TriggerSemiAutoCallPocketChanged(bool semiAutoCallPocketEnabled)
+    public void _TriggerCallPassOptionChanged(bool callPassOptionEnabled)
     {
-        networkingManager._OnSemiAutoCallPocketChanged(semiAutoCallPocketEnabled);
+        networkingManager._OnCallPassOptionChanged(callPassOptionEnabled);
     }
 
     public void _TriggerTimerChanged(uint timerSelected)
@@ -837,12 +853,17 @@ public class BilliardsModule : UdonSharpBehaviour
 #endif
             if (repositionStateLocal == 1 || repositionStateLocal == 2)
             {
-                if (semiAutoCallBallLocal)
+                // if (semiAutoCallBallLocal)
+                // {
+                //     networkingManager.calledBallsSynced = 0;
+                // }
+                // if (semiAutoCallPocketLocal)
+                // {
+                //     networkingManager.pointPocketsSynced = 0;
+                // }
+                if (semiAutoCallLocal)
                 {
                     networkingManager.calledBallsSynced = 0;
-                }
-                if (semiAutoCallPocketLocal)
-                {
                     networkingManager.pointPocketsSynced = 0;
                 }
             }
@@ -1000,8 +1021,10 @@ public class BilliardsModule : UdonSharpBehaviour
             networkingManager.noGuidelineSynced,
             networkingManager.noLockingSynced,
             networkingManager.rackConditionSynced,
-            networkingManager.semiAutoCallBallSynced,
-            networkingManager.semiAutoCallPocketSynced
+            // networkingManager.semiAutoCallBallSynced,
+            // networkingManager.semiAutoCallPocketSynced
+            networkingManager.semiAutoCallSynced,
+            networkingManager.callPassOptionSynced
         );
 
         if (gameStateLocal != networkingManager.gameStateSynced && networkingManager.gameStateSynced == 1)
@@ -1080,7 +1103,7 @@ public class BilliardsModule : UdonSharpBehaviour
         // _LogInfo($"  semiAutoCall = {semiAutoCallLocal}, semiAutoCalledPocket = {semiAutoCalledPocket}, calledPocketId = {calledPocketId}, calledBalls = {calledBallsLocal:X4}");
         _LogInfo($"  semiAutoCalledPocket = {semiAutoCalledPocket}, calledPocketId = {calledPocketId}, calledBalls = {calledBallsLocal:X4}");
 #endif
-        semiAutoCallTick = (semiAutoCallBallLocal || semiAutoCallPocketLocal);
+        semiAutoCallTick = semiAutoCallLocal; // (semiAutoCallBallLocal || semiAutoCallPocketLocal);
     }
 
     private void onRemoteGlobalSettingsUpdated(string tournamentRefereeSynced, byte physicsModeSynced, byte tableModelSynced, byte tableSkinSynced)
@@ -1135,7 +1158,8 @@ public class BilliardsModule : UdonSharpBehaviour
 
     private void onRemoteGameSettingsUpdated(uint gameModeSynced, int goalPointsSynced, uint timerSynced, 
         bool teamsSynced, bool noGuidelineSynced, bool noLockingSynced, uint rackConditionSynced,
-        bool semiAutoCallBallSynced, bool semiAutoCallPocketSynced)
+        // bool semiAutoCallBallSynced, bool semiAutoCallPocketSynced)
+        bool semiAutoCallSynced, bool callPassOptionSynced)
     {
         if (
             gameModeLocal == gameModeSynced &&
@@ -1145,14 +1169,15 @@ public class BilliardsModule : UdonSharpBehaviour
             noGuidelineLocal == noGuidelineSynced &&
             noLockingLocal == noLockingSynced &&
             rackConditionLocal == rackConditionSynced &&
-            semiAutoCallBallLocal == semiAutoCallBallSynced &&
-            semiAutoCallPocketLocal == semiAutoCallPocketSynced
+            semiAutoCallLocal == semiAutoCallSynced &&
+            callPassOptionLocal == callPassOptionSynced
         )
         {
             return;
         }
 
-        _LogInfo($"onRemoteGameSettingsUpdated gameMode={gameModeSynced} goalPoints={goalPointsSynced} timer={timerSynced} teams={teamsSynced} guideline={!noGuidelineSynced} locking={!noLockingSynced} rackCondition={rackConditionSynced} semiAutoCallBall={semiAutoCallBallSynced} semiAutoCallPocket={semiAutoCallPocketSynced}");
+        // _LogInfo($"onRemoteGameSettingsUpdated gameMode={gameModeSynced} goalPoints={goalPointsSynced} timer={timerSynced} teams={teamsSynced} guideline={!noGuidelineSynced} locking={!noLockingSynced} rackCondition={rackConditionSynced} semiAutoCallBall={semiAutoCallBallSynced} semiAutoCallPocket={semiAutoCallPocketSynced}");
+        _LogInfo($"onRemoteGameSettingsUpdated gameMode={gameModeSynced} goalPoints={goalPointsSynced} timer={timerSynced} teams={teamsSynced} guideline={!noGuidelineSynced} locking={!noLockingSynced} rackCondition={rackConditionSynced} semiAutoCall={semiAutoCallSynced} callPassOption={callPassOptionSynced}");
 
         if (gameModeLocal != gameModeSynced || goalPointsLocal != goalPointsSynced)
         {
@@ -1201,15 +1226,27 @@ public class BilliardsModule : UdonSharpBehaviour
             refreshToggles = true;
         }
 
-        if (semiAutoCallBallLocal != semiAutoCallBallSynced)
+        // if (semiAutoCallBallLocal != semiAutoCallBallSynced)
+        // {
+        //     semiAutoCallBallLocal = semiAutoCallBallSynced;
+        //     refreshToggles = true;
+        // }
+        //
+        // if (semiAutoCallPocketLocal != semiAutoCallPocketSynced)
+        // {
+        //     semiAutoCallPocketLocal = semiAutoCallPocketSynced;
+        //     refreshToggles = true;
+        // }
+
+        if (semiAutoCallLocal != semiAutoCallSynced)
         {
-            semiAutoCallBallLocal = semiAutoCallBallSynced;
+            semiAutoCallLocal = semiAutoCallSynced;
             refreshToggles = true;
         }
 
-        if (semiAutoCallPocketLocal != semiAutoCallPocketSynced)
+        if (callPassOptionLocal != callPassOptionSynced)
         {
-            semiAutoCallPocketLocal = semiAutoCallPocketSynced;
+            callPassOptionLocal = callPassOptionSynced;
             refreshToggles = true;
         }
 
@@ -1551,13 +1588,20 @@ public class BilliardsModule : UdonSharpBehaviour
 
         if (repositionStateLocal == 0)
         {
-            if (semiAutoCallBallLocal)
+            // if (semiAutoCallBallLocal)
+            // {
+            //     calledBallId = -2;
+            //     semiAutoCalledTimeBall = 0;
+            // }
+            // if (semiAutoCallPocketLocal)
+            // {
+            //     calledPocketId = -2;
+            //     semiAutoCalledPocket = false;
+            // }
+            if (semiAutoCallLocal)
             {
                 calledBallId = -2;
                 semiAutoCalledTimeBall = 0;
-            }
-            if (semiAutoCallPocketLocal)
-            {
                 calledPocketId = -2;
                 semiAutoCalledPocket = false;
             }
@@ -1601,20 +1645,25 @@ public class BilliardsModule : UdonSharpBehaviour
         _LogInfo($"onRemoteNextBallRepositionStateChanged nextBallRepositionState=0x{nextBallRepositionStateSynced:X02}");
         nextBallRepositionStateLocal = nextBallRepositionStateSynced;
 
-        if (semiAutoCallBallLocal || semiAutoCallPocketLocal)
+        // if (semiAutoCallBallLocal || semiAutoCallPocketLocal)
+        if (semiAutoCallLocal)
         {
             if ((nextBallRepositionStateLocal & 0x1u) == 0 /* || (nextBallRepositionStateLocal & 0x2u) == 0 */ )
             {
-                if (semiAutoCallBallLocal)
-                {
-                    calledBallId = -2;
-                    semiAutoCalledTimeBall = 0;
-                }
-                if (semiAutoCallPocketLocal)
-                {
-                    calledPocketId = -2;
-                    semiAutoCalledPocket = false;
-                }
+                // if (semiAutoCallBallLocal)
+                // {
+                //     calledBallId = -2;
+                //     semiAutoCalledTimeBall = 0;
+                // }
+                // if (semiAutoCallPocketLocal)
+                // {
+                //     calledPocketId = -2;
+                //     semiAutoCalledPocket = false;
+                // }
+                calledBallId = -2;
+                semiAutoCalledTimeBall = 0;
+                calledPocketId = -2;
+                semiAutoCalledPocket = false;
             }
         }
 
@@ -2273,12 +2322,15 @@ public class BilliardsModule : UdonSharpBehaviour
                     // next ballがkitchen内の場合はセンターに移動させる
                     checkNextInKitchenThenMoveToCenter();
                 }
-                
-                if (!foulCondition && !isObjectiveSink && 0 < pointPocketsLocal && 0 < calledBallsLocal)
+
+                if (callPassOptionLocal)
                 {
-                    if (pushOutStateLocal == PUSHOUT_ENDED)
+                    if (!foulCondition && !isObjectiveSink && 0 < pointPocketsLocal && 0 < calledBallsLocal)
                     {
-                        pushOutStateLocal = PUSHOUT_REACTIONING;
+                        if (pushOutStateLocal == PUSHOUT_ENDED)
+                        {
+                            pushOutStateLocal = PUSHOUT_REACTIONING;
+                        }
                     }
                 }
 
@@ -2897,12 +2949,17 @@ public class BilliardsModule : UdonSharpBehaviour
         //ballsP[target] = new Vector3(x, 0.0f, 0.0f);
         pocketedballUponPool(0x1u << target, x, break_order_rotation.Length);
 
-        if (semiAutoCallBallLocal)
+        // if (semiAutoCallBallLocal)
+        // {
+        //     networkingManager.calledBallsSynced = 0;
+        // }
+        // if (semiAutoCallPocketLocal)
+        // {
+        //     networkingManager.pointPocketsSynced = 0;
+        // }
+        if (semiAutoCallLocal)
         {
             networkingManager.calledBallsSynced = 0;
-        }
-        if (semiAutoCallPocketLocal)
-        {
             networkingManager.pointPocketsSynced = 0;
         }
         
@@ -2956,12 +3013,17 @@ public class BilliardsModule : UdonSharpBehaviour
             pocketedballUponPool(0x1u << target, x, break_order_rotation.Length);
         }
         
-        if (semiAutoCallBallLocal)
+        // if (semiAutoCallBallLocal)
+        // {
+        //     networkingManager.calledBallsSynced = 0;
+        // }
+        // if (semiAutoCallPocketLocal)
+        // {
+        //     networkingManager.pointPocketsSynced = 0;
+        // }
+        if (semiAutoCallLocal)
         {
             networkingManager.calledBallsSynced = 0;
-        }
-        if (semiAutoCallPocketLocal)
-        {
             networkingManager.pointPocketsSynced = 0;
         }
 
@@ -3394,7 +3456,8 @@ public class BilliardsModule : UdonSharpBehaviour
             int target = -1;
             int pocketId = -1;
 
-            if ((semiAutoCallBallLocal || semiAutoCallPocketLocal) && ((semiAutoCalledTimeBall <= 0 && calledBallId < 0) ||
+            // if ((semiAutoCallBallLocal || semiAutoCallPocketLocal) && ((semiAutoCalledTimeBall <= 0 && calledBallId < 0) ||
+            if (semiAutoCallLocal && ((semiAutoCalledTimeBall <= 0 && calledBallId < 0) ||
                                                                        (!semiAutoCalledPocket && calledPocketId < 0 && 0 < calledBallsLocal)))
             {
                 uint findBalls = ballsPocketedLocal;
@@ -3427,7 +3490,8 @@ public class BilliardsModule : UdonSharpBehaviour
                 }
 #endif
 
-                if (semiAutoCallBallLocal && semiAutoCalledTimeBall <= 0 && calledBallId < 0)
+                // if (semiAutoCallBallLocal && semiAutoCalledTimeBall <= 0 && calledBallId < 0)
+                if (semiAutoCallLocal && semiAutoCalledTimeBall <= 0 && calledBallId < 0)
                 {
 #if EIJIS_DEBUG_SEMIAUTO_CALL
                     _LogInfo($"  elapsedSeconds = {elapsedSeconds}");
@@ -3443,7 +3507,8 @@ public class BilliardsModule : UdonSharpBehaviour
                 }
             }
                 
-            if (semiAutoCallPocketLocal && !semiAutoCalledPocket && calledPocketId < 0 && 0 < calledBallsLocal)
+            // if (semiAutoCallPocketLocal && !semiAutoCalledPocket && calledPocketId < 0 && 0 < calledBallsLocal)
+            if (semiAutoCallLocal && !semiAutoCalledPocket && calledPocketId < 0 && 0 < calledBallsLocal)
             {
                 float elapsedSeconds = (Networking.GetServerTimeInMilliseconds() - semiAutoCallDelayBase) / 1000.0f;
 #if EIJIS_DEBUG_SEMIAUTO_CALL

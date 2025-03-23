@@ -35,8 +35,10 @@ public class MenuManager : UdonSharpBehaviour
     [SerializeField] public UIButton buttonLockingToggle;
     [SerializeField] public UIButton buttonRackSheet;
     [SerializeField] public UIButton buttonWoodFrame;
-    [SerializeField] public UIButton buttonSemiAutoCallBallToggle;
-    [SerializeField] public UIButton buttonSemiAutoCallPocketToggle;
+    // [SerializeField] public UIButton buttonSemiAutoCallBallToggle;
+    // [SerializeField] public UIButton buttonSemiAutoCallPocketToggle;
+    [SerializeField] public UIButton buttonSemiAutoCallToggle;
+    [SerializeField] public UIButton buttonCallPassOptionToggle;
 
     [SerializeField] public UIButton buttonLeave;
     [SerializeField] public UIButton buttonPlay;
@@ -246,8 +248,10 @@ public class MenuManager : UdonSharpBehaviour
         buttonLockingToggle._SetButtonToggle(!table.noLockingLocal);
         buttonRackSheet._ResetPushButton();
         buttonWoodFrame._ResetPushButton();
-        buttonSemiAutoCallBallToggle._SetButtonToggle(table.semiAutoCallBallLocal);
-        buttonSemiAutoCallPocketToggle._SetButtonToggle(table.semiAutoCallPocketLocal);
+        // buttonSemiAutoCallBallToggle._SetButtonToggle(table.semiAutoCallBallLocal);
+        // buttonSemiAutoCallPocketToggle._SetButtonToggle(table.semiAutoCallPocketLocal);
+        buttonSemiAutoCallToggle._SetButtonToggle(table.semiAutoCallLocal);
+        buttonCallPassOptionToggle._SetButtonToggle(table.callPassOptionLocal);
         if (table.rackConditionLocal == 0)
         {
             buttonRackSheet._SetButtonPushed();
@@ -280,8 +284,10 @@ public class MenuManager : UdonSharpBehaviour
         buttonTimerRight.disableInteractions = isNormalPlayer;
         buttonRackSheet.disableInteractions = isNormalPlayer;
         buttonWoodFrame.disableInteractions = isNormalPlayer;
-        buttonSemiAutoCallBallToggle.disableInteractions = isNormalPlayer;
-        buttonSemiAutoCallPocketToggle.disableInteractions = isNormalPlayer;
+        // buttonSemiAutoCallBallToggle.disableInteractions = isNormalPlayer;
+        // buttonSemiAutoCallPocketToggle.disableInteractions = isNormalPlayer;
+        buttonSemiAutoCallToggle.disableInteractions = isNormalPlayer;
+        buttonCallPassOptionToggle.disableInteractions = isNormalPlayer;
 
         refreshJoinButtons();
         _RefreshToggleSettings();
@@ -384,13 +390,21 @@ public class MenuManager : UdonSharpBehaviour
 #endif
                 table._TriggerRackCondisionChanged(1);
             }
-            else if (button.name == "SemiAutoCallBallToggle")
+            // else if (button.name == "SemiAutoCallBallToggle")
+            // {
+            //     table._TriggerSemiAutoCallBallChanged(button.toggleState);
+            // }
+            // else if (button.name == "SemiAutoCallPocketToggle")
+            // {
+            //     table._TriggerSemiAutoCallPocketChanged(button.toggleState);
+            // }
+            else if (button.name == "SemiAutoCallToggle")
             {
-                table._TriggerSemiAutoCallBallChanged(button.toggleState);
+                table._TriggerSemiAutoCallChanged(button.toggleState);
             }
-            else if (button.name == "SemiAutoCallPocketToggle")
+            else if (button.name == "CallPassOptionToggle")
             {
-                table._TriggerSemiAutoCallPocketChanged(button.toggleState);
+                table._TriggerCallPassOptionChanged(button.toggleState);
             }
             else if (button.name == "TimeRight")
             {

@@ -73,8 +73,10 @@ public class NetworkingManager : UdonSharpBehaviour
 
     [UdonSynced] [NonSerialized] public int goalPointsSynced = 120;
     [UdonSynced] [NonSerialized] public byte rackConditionSynced = 0;
-    [UdonSynced] [NonSerialized] public bool semiAutoCallBallSynced;
-    [UdonSynced] [NonSerialized] public bool semiAutoCallPocketSynced;
+    // [UdonSynced] [NonSerialized] public bool semiAutoCallBallSynced;
+    // [UdonSynced] [NonSerialized] public bool semiAutoCallPocketSynced;
+    [UdonSynced] [NonSerialized] public bool semiAutoCallSynced;
+    [UdonSynced] [NonSerialized] public bool callPassOptionSynced;
 
     // the timer for the current game in seconds
     [UdonSynced] [NonSerialized] public uint timerSynced;
@@ -598,16 +600,30 @@ public class NetworkingManager : UdonSharpBehaviour
         bufferMessages(false);
     }
 
-    public void _OnSemiAutoCallBallChanged(bool semiAutoCallBallEnabled)
+    // public void _OnSemiAutoCallBallChanged(bool semiAutoCallBallEnabled)
+    // {
+    //     semiAutoCallBallSynced = semiAutoCallBallEnabled;
+    //
+    //     bufferMessages(false);
+    // }
+    //
+    // public void _OnSemiAutoCallPocketChanged(bool semiAutoCallPocketEnabled)
+    // {
+    //     semiAutoCallPocketSynced = semiAutoCallPocketEnabled;
+    //
+    //     bufferMessages(false);
+    // }
+
+    public void _OnSemiAutoCallChanged(bool semiAutoCallEnabled)
     {
-        semiAutoCallBallSynced = semiAutoCallBallEnabled;
+        semiAutoCallSynced = semiAutoCallEnabled;
 
         bufferMessages(false);
     }
 
-    public void _OnSemiAutoCallPocketChanged(bool semiAutoCallPocketEnabled)
+    public void _OnCallPassOptionChanged(bool callPassOptionEnabled)
     {
-        semiAutoCallPocketSynced = semiAutoCallPocketEnabled;
+        callPassOptionSynced = callPassOptionEnabled;
 
         bufferMessages(false);
     }
