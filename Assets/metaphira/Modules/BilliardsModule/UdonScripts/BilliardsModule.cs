@@ -2238,7 +2238,7 @@ public class BilliardsModule : UdonSharpBehaviour
 
                 if (isScratch)
                 {
-                    ballsP[0] = initialPositions[gameModeLocal][0];
+                    ballsP[0] = new Vector3(-k_SPOT_POSITION_X, 0.0f, 0.0f); // initialPositions[gameModeLocal][0];
                 }
                 else if (isNoTouch || isNoCushon)
                 {
