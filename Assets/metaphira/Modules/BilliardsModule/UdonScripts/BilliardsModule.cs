@@ -3656,11 +3656,11 @@ public class BilliardsModule : UdonSharpBehaviour
         int[] scoresB = (int[])b[2];
         for (int i = 0; i < fbScoresLocal.Length; i++) if (scoresA[i] != scoresB[i]) return false;
 
-        int[] pointsA = (int[])a[18];
-        int[] pointsB = (int[])b[18];
+        int[] pointsA = (int[])a[19];
+        int[] pointsB = (int[])b[19];
         for (int i = 0; i < totalPointsLocal.Length; i++) if (pointsA[i] != pointsB[i]) return false;
 
-        for (int i = 0; i < a.Length; i++) if (i != 0 && i != 2 && i != 18 && !a[i].Equals(b[i])) return false;
+        for (int i = 0; i < a.Length; i++) if (i != 0 && i != 2 && i != 19 && !a[i].Equals(b[i])) return false;
 
         return true;
     }
