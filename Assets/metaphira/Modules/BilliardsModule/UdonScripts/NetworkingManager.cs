@@ -37,6 +37,7 @@ public class NetworkingManager : UdonSharpBehaviour
     [UdonSynced] [NonSerialized] public uint otherPocketedSynced;
     [UdonSynced] [NonSerialized] public uint pointPocketsSynced;
     [UdonSynced] [NonSerialized] public uint calledBallsSynced;
+    [UdonSynced] [NonSerialized] public bool safetyCalledSynced;
 
     // the current team which is playing
     [UdonSynced] [NonSerialized] public byte teamIdSynced;
@@ -302,6 +303,7 @@ public class NetworkingManager : UdonSharpBehaviour
         calledBallsSynced = 0;
         pointPocketsSynced = 0;
         callShotLockSynced = false;
+        safetyCalledSynced = false;
         
         bufferMessages(false);
     }
@@ -345,6 +347,7 @@ public class NetworkingManager : UdonSharpBehaviour
         calledBallsSynced = 0;
         pointPocketsSynced = 0;
         callShotLockSynced = false;
+        safetyCalledSynced = false;
         nextBallRepositionStateSynced = (byte)(reBreakAllowed ? 0x4u : 0);
 
         bufferMessages(false);
@@ -362,6 +365,7 @@ public class NetworkingManager : UdonSharpBehaviour
         calledBallsSynced = 0;
         pointPocketsSynced = 0;
         callShotLockSynced = false;
+        safetyCalledSynced = false;
         nextBallRepositionStateSynced = (byte)((nextBallReposition ? 0x1u : 0)|(reposition ? 0 : 0x2u)|(reBreakAllowed ? 0x4u : 0));
 
         bufferMessages(false);
@@ -376,6 +380,7 @@ public class NetworkingManager : UdonSharpBehaviour
         calledBallsSynced = 0;
         pointPocketsSynced = 0;
         callShotLockSynced = false;
+        safetyCalledSynced = false;
 
         bufferMessages(false);
     }
@@ -480,6 +485,7 @@ public class NetworkingManager : UdonSharpBehaviour
             teamColorSynced = (byte)(teamIdSynced ^ 0x1u);
             pointPocketsSynced = 0;
             calledBallsSynced = 0;
+            safetyCalledSynced = false;
         }
 
         bufferMessages(false);
@@ -514,6 +520,7 @@ public class NetworkingManager : UdonSharpBehaviour
         if (enabled)
         {
             calledBalls = ball_bit;
+            safetyCalledSynced = false;
         }
         else
         {
@@ -521,6 +528,7 @@ public class NetworkingManager : UdonSharpBehaviour
         }
 
         calledBallsSynced = calledBalls;
+        // safetyCalledSynced = (calledBallsSynced == 0 || pointPocketsSynced == 0);
         
         bufferMessages(false);
     }
@@ -532,6 +540,7 @@ public class NetworkingManager : UdonSharpBehaviour
         if (pocketEnabled)
         {
             pointPockets = pocketBit;
+            safetyCalledSynced = false;
         }
         else
         {
@@ -539,6 +548,7 @@ public class NetworkingManager : UdonSharpBehaviour
         }
 
         pointPocketsSynced = pointPockets;
+        // safetyCalledSynced = (calledBallsSynced == 0 || pointPocketsSynced == 0);
         
         bufferMessages(false);
     }
@@ -546,6 +556,18 @@ public class NetworkingManager : UdonSharpBehaviour
     public void _OnCallShotLockChanged(bool callShotLockEnabled)
     {
         callShotLockSynced = callShotLockEnabled;
+
+        bufferMessages(false);
+    }
+
+    public void _OnSafetyCallChanged(bool newState)
+    {
+        safetyCalledSynced = newState;
+        if (safetyCalledSynced)
+        {
+            calledBallsSynced = 0;
+            pointPocketsSynced = 0;
+        }
 
         bufferMessages(false);
     }
@@ -564,6 +586,13 @@ public class NetworkingManager : UdonSharpBehaviour
 
         bufferMessages(false);
     }
+
+    // public void _OnSafetyCallChanged(bool newState)
+    // {
+    //     safetyCalledSynced = newState;
+    //
+    //     bufferMessages(false);
+    // }
 
     public void _OnTeamsChanged(bool teamsEnabled)
     {

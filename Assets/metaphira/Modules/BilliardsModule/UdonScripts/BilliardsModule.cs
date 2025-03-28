@@ -12,7 +12,8 @@
 //#define TKCH_DEBUG_BREAKING_FOUL
 //#define TKCH_DEBUG_CALLSHOT_DELAY
 //#define TKCH_DEBUG_CALLSHOT_POCKETEDBALL
-//#define TKCH_DEBUG_SCORE
+// #define TKCH_DEBUG_CALLSHOT_POCKET_MARKER
+// #define TKCH_DEBUG_SCORE
 //#define TKCH_DEBUG_WINRACKCOUNT
 // #define TKCH_DEBUG_SEMIAUTO_CALL
 // #define TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION
@@ -231,6 +232,7 @@ public class BilliardsModule : UdonSharpBehaviour
     [NonSerialized] public uint otherPocketedLocal;
     [NonSerialized] public uint pointPocketsLocal;
     [NonSerialized] public uint calledBallsLocal;
+    [NonSerialized] public bool safetyCalledLocal;
     [NonSerialized] public uint teamIdLocal;
     [NonSerialized] public uint fourBallCueBallLocal;
     [NonSerialized] public bool isTableOpenLocal;
@@ -1014,6 +1016,10 @@ public class BilliardsModule : UdonSharpBehaviour
         // _LogInfo($"  semiAutoCall = {semiAutoCallLocal}, semiAutoCalledPocket = {semiAutoCalledPocket}, calledPocketId = {calledPocketId}, calledBalls = {calledBallsLocal:X4}");
         _LogInfo($"  semiAutoCalledPocket = {semiAutoCalledPocket}, calledPocketId = {calledPocketId}, calledBalls = {calledBallsLocal:X4}");
 #endif
+#if TKCH_DEBUG_CALLSHOT_POCKET_MARKER
+        _LogInfo($"TKCH TKCH_DEBUG_CALLSHOT_POCKET_MARKER Local  pointPockets={pointPocketsLocal:X2}, calledBallsLocal={calledBallsLocal:X2}, safetyCalled={safetyCalledLocal}");
+        _LogInfo($"TKCH TKCH_DEBUG_CALLSHOT_POCKET_MARKER Synced pointPockets={networkingManager.pointPocketsSynced:X2}, calledBallsLocal={networkingManager.calledBallsSynced:X2}, safetyCalled={networkingManager.safetyCalledSynced}");
+#endif
 
         // propagate game settings first
         onRemoteGlobalSettingsUpdated(
@@ -1087,9 +1093,9 @@ public class BilliardsModule : UdonSharpBehaviour
         onRemoteTurnStateChanged(networkingManager.turnStateSynced, stateIdChanged);
         onRemotePreviewWinningTeamChanged(networkingManager.previewWinningTeamSynced);
 
-        onRemotePointPocketsChanged(networkingManager.pointPocketsSynced, networkingManager.callShotLockSynced, 
-            stateIdChanged);
         onRemoteCalledBallsChanged(networkingManager.calledBallsSynced, stateIdChanged);
+        onRemotePointPocketsChanged(networkingManager.pointPocketsSynced, networkingManager.callShotLockSynced, 
+            networkingManager.safetyCalledSynced, stateIdChanged);
         onRemoteNextBallRepositionStateChanged(networkingManager.nextBallRepositionStateSynced);
         graphicsManager._UpdateCueGrip();
 
@@ -1493,6 +1499,7 @@ public class BilliardsModule : UdonSharpBehaviour
         this.transform.Find("intl.controls/skipturn").gameObject.SetActive(false);
         this.transform.Find("intl.controls/callShotLock").gameObject.SetActive(false);
         this.transform.Find("intl.controls/pushOut").gameObject.SetActive(false);
+        this.transform.Find("intl.controls/callSafety").gameObject.SetActive(false);
 
         // Remove any access rights
         localPlayerId = -1;
@@ -1723,14 +1730,16 @@ public class BilliardsModule : UdonSharpBehaviour
         // _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}");
 #endif
 
-        if (isRotation && (afterBreak || !stateIdChanged))
-        {
-            graphicsManager._UpdatePointPocketMarker(pointPocketsLocal, callShotLockLocal);
-        }
-        else
-        {
-            graphicsManager._DisablePointPocketMarker();
-        }
+        // // if (isRotation && (afterBreak || !stateIdChanged))
+        // if (isRotation && (safetyCalledLocal || calledBallsLocal != 0 || pointPocketsLocal != 0))
+        // {
+        //     graphicsManager._UpdatePointPocketMarker(pointPocketsLocal, callShotLockLocal);
+        // }
+        // else
+        // {
+        //     graphicsManager._DisablePointPocketMarker();
+        // }
+        graphicsManager._DisablePointPocketMarker();
         // calledBallId = -2;
         // calledPocketId = -2;
         // semiAutoCalledBall = false;
@@ -1814,18 +1823,36 @@ public class BilliardsModule : UdonSharpBehaviour
         }
     }
     
-    private void onRemotePointPocketsChanged(uint pointPocketsSynced, bool callShotLockSynced, bool stateIdChanged)
+    private void onRemotePointPocketsChanged(uint pointPocketsSynced, bool callShotLockSynced, bool safetyCalledSynced, bool stateIdChanged)
     {
         if (!gameLive) return;
 
-        if (pointPocketsLocal == pointPocketsSynced && callShotLockLocal == callShotLockSynced && 0 < stateIdLocal ) return;
+        if (pointPocketsLocal == pointPocketsSynced && callShotLockLocal == callShotLockSynced && safetyCalledLocal == safetyCalledSynced && 0 < stateIdLocal ) return;
 
-        _LogInfo($"onRemotePointPocketsChanged pointPockets={pointPocketsSynced:X2}, callShotLock={callShotLockSynced}");
+        _LogInfo($"onRemotePointPocketsChanged pointPockets={pointPocketsSynced:X2}, callShotLock={callShotLockSynced}, safetyCalled={safetyCalledSynced}");
         pointPocketsLocal = pointPocketsSynced;
         callShotLockLocal = callShotLockSynced;
-        if (isRotation && (afterBreak || !stateIdChanged))
+        safetyCalledLocal = safetyCalledSynced;
+        // if (isRotation && (afterBreak || !stateIdChanged))
+        if (isRotation)
         {
-            graphicsManager._UpdatePointPocketMarker(pointPocketsLocal, callShotLockLocal);
+            if (safetyCalledLocal || calledBallsLocal != 0 || pointPocketsLocal != 0)
+            {
+#if TKCH_DEBUG_CALLSHOT_POCKET_MARKER
+                // _LogInfo($"TKCH TKCH_DEBUG_CALLSHOT_POCKET_MARKER pointPockets={pointPocketsLocal:X2}, calledBallsLocal={calledBallsLocal:X2}, safetyCalled={safetyCalledLocal}");
+#endif
+                graphicsManager._UpdatePointPocketMarker(pointPocketsLocal, callShotLockLocal);
+            }
+            else
+            {
+                graphicsManager._DisablePointPocketMarker();
+            }
+            if (!safetyCalledLocal && (calledBallsLocal == 0 || pointPocketsLocal == 0))
+            {
+                devhit.SetActive(false);
+                guideline.SetActive(false);
+            }
+            graphicsManager._UpdateCallSafety(safetyCalledLocal);
         }
         if (!stateIdChanged)
         {
@@ -2875,12 +2902,14 @@ public class BilliardsModule : UdonSharpBehaviour
         if (isRotation && isOurTurnVar)
         {
             this.transform.Find("intl.controls/callShotLock").gameObject.SetActive(true);
+            this.transform.Find("intl.controls/callSafety").gameObject.SetActive(true);
             this.transform.Find("intl.controls/pushOut").gameObject.SetActive(enablePushOutLocal && (pushOutStateLocal == PUSHOUT_DONT || pushOutStateLocal == PUSHOUT_DOING));
             this.transform.Find("intl.controls/skipturn").gameObject.SetActive(practiceEnable || (enablePushOutLocal && (pushOutStateLocal == PUSHOUT_REACTIONING)) || (pushOutStateLocal == PUSHOUT_ILLEGAL_REACTIONING));
         }
         else
         {
             this.transform.Find("intl.controls/callShotLock").gameObject.SetActive(false);
+            this.transform.Find("intl.controls/callSafety").gameObject.SetActive(false);
             this.transform.Find("intl.controls/pushOut").gameObject.SetActive(false);
             this.transform.Find("intl.controls/skipturn").gameObject.SetActive(practiceEnable);
         }
@@ -2901,6 +2930,7 @@ public class BilliardsModule : UdonSharpBehaviour
 
         if (isRotation)
         {
+#if TKCH_CALLSHOT_PUSHOUT_DESKTOP_INDICATE_TOGGLE
             if (!enablePushOutLocal)
             {
                 desktopManager._ChangeCallShotPushOut(true);
@@ -2910,10 +2940,17 @@ public class BilliardsModule : UdonSharpBehaviour
                 bool canPushOut = (pushOutStateLocal == PUSHOUT_DONT || pushOutStateLocal == PUSHOUT_DOING);
                 desktopManager._ChangeCallShotPushOut(!canPushOut);
             }
+#else            
+            desktopManager._CallShotSetActive(true);
+            desktopManager._CallSafetySetActive(true);
+            bool canPushOut = (pushOutStateLocal == PUSHOUT_DONT || pushOutStateLocal == PUSHOUT_DOING);
+            desktopManager._PushOutSetActive(canPushOut);
+#endif  
         }
         else
         {
             desktopManager._CallShotSetActive(false);
+            desktopManager._CallSafetySetActive(false);
             desktopManager._PushOutSetActive(false);
         }
 
@@ -2953,6 +2990,11 @@ public class BilliardsModule : UdonSharpBehaviour
         //graphicsManager._UpdatePointPocketMarker(pointPocketsLocal, callShotLockLocal);
     }
     
+    public void _CallSafety()
+    {
+        networkingManager._OnSafetyCallChanged(!safetyCalledLocal);
+    }
+
     public void _PushOut()
     {
         networkingManager._OnPushOutChanged(pushOutStateLocal);

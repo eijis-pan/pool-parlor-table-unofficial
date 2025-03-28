@@ -25,6 +25,8 @@ public class DesktopManager : UdonSharpBehaviour
     [SerializeField] private GameObject powerIndicator;
     [SerializeField] private GameObject pressE;
     [SerializeField] private GameObject callShot;
+    [SerializeField] private GameObject safety;
+    [SerializeField] private GameObject safetyCalled;
     [SerializeField] private GameObject pushOut;
     [SerializeField] private GameObject pushOutDoing;
 
@@ -62,6 +64,7 @@ public class DesktopManager : UdonSharpBehaviour
         cursorClampZ = table.k_TABLE_HEIGHT;
         // Transform callShot = table.transform.Find("intl.desktop/desktop/desktop_callShot");
         // Transform pushOut = table.transform.Find("intl.desktop/desktop/desktop_pushOut");
+        // Transform safety = table.transform.Find("intl.desktop/desktop/desktop_safety");
     }
 
     public void _OnGameStarted()
@@ -247,6 +250,7 @@ public class DesktopManager : UdonSharpBehaviour
                 updateSpinIndicator();
                 updateJumpIndicator();
                 updateCallShotIndicator();
+                updateCallSafetyIndicator();
                 if (table.enablePushOutLocal) updatePushOutIndicator();
             }
         }
@@ -255,6 +259,7 @@ public class DesktopManager : UdonSharpBehaviour
         powerIndicator.transform.localScale = new Vector3(1.0f - (power * 2.0f), 1.0f, 1.0f);
 
         pushOutDoing.SetActive(table.pushOutStateLocal == table.PUSHOUT_DOING);
+        safetyCalled.SetActive(table.safetyCalledLocal);
 
         bool hitCtrlNow = Input.GetKeyDown(KeyCode.LeftControl) || Input.GetKeyDown(KeyCode.RightControl);
         bool hitCtrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
@@ -525,6 +530,16 @@ public class DesktopManager : UdonSharpBehaviour
         }
     }
 
+    private void updateCallSafetyIndicator()
+    {
+        if (!safety.activeSelf) return;
+        
+        if (Input.GetKeyDown(KeyCode.T))
+        { 
+            table._CallSafety();
+        }
+    }
+
     private void updatePushOutIndicator()
     {
         if (!pushOut.activeSelf) return;
@@ -643,6 +658,11 @@ public class DesktopManager : UdonSharpBehaviour
     public void _CallShotSetActive(bool show)
     {
         callShot.SetActive(show);
+    }
+
+    public void _CallSafetySetActive(bool show)
+    {
+        safety.SetActive(show);
     }
 
     public void _PushOutSetActive(bool show)

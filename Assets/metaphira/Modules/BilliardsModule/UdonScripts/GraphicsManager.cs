@@ -1,4 +1,5 @@
 ﻿//#define TKCH_DEBUG_BREAKING_FOUL
+// #define TKCH_DEBUG_CALLSHOT_POCKET_MARKER
 
 using UdonSharp;
 using UnityEngine;
@@ -21,6 +22,9 @@ public class GraphicsManager : UdonSharpBehaviour
     [SerializeField] Material calleShotLockWhite;
     [SerializeField] Material pushOutDont;
     [SerializeField] Material pushOutDoing;
+    private Material callSafetyOn;
+    private Material callSafetyOff;
+    private MeshRenderer callSafetyRenderer;
 
     [Header("4 Ball")]
     [SerializeField] GameObject fourBallPoint;
@@ -132,6 +136,15 @@ public class GraphicsManager : UdonSharpBehaviour
             cushionTouchActive[i] = false;
             cushionTouchTime[i] = 0;
         }
+
+        Transform callSafety = table.transform.Find("intl.controls/callSafety");
+        Transform safetyCalled = callSafety.Find("render");
+        if (!ReferenceEquals(null, safetyCalled))
+        {
+            callSafetyRenderer = safetyCalled.GetComponent<MeshRenderer>();
+        }
+        callSafetyOn = table.transform.Find("intl.balls/dev-hit").GetComponent<MeshRenderer>().sharedMaterial;
+        callSafetyOff = table.transform.Find("intl.cue-0/body/render").GetComponent<MeshRenderer>().sharedMaterial;
 
         _DisableObjects();
     }
@@ -877,6 +890,7 @@ int uniform_cue_colour;
         table.transform.Find("intl.controls/skipturn").gameObject.SetActive(false);
         table.transform.Find("intl.controls/callShotLock").gameObject.SetActive(false);
         table.transform.Find("intl.controls/pushOut").gameObject.SetActive(false);
+        table.transform.Find("intl.controls/callSafety").gameObject.SetActive(false);
         _HideTimers();
         
         _DisablePointPocketMarker();
@@ -997,6 +1011,9 @@ int uniform_cue_colour;
 
     public void _UpdatePointPocketMarker(uint pointPockets, bool callShotLock)
     {
+#if TKCH_DEBUG_CALLSHOT_POCKET_MARKER
+        table._LogInfo($"TKCH TKCH_DEBUG_CALLSHOT_POCKET_MARKER GraphicsManager::_UpdatePointPocketMarker(pointPockets={pointPockets:X2}, callShotLock={callShotLock})");
+#endif
         for (int i = 0; i < table.pointPocketMarkers.Length; i++)
         {
             bool enable = (pointPockets & (0x1u << i)) != 0;
@@ -1106,5 +1123,10 @@ int uniform_cue_colour;
                 balls[i].GetComponent<MeshRenderer>().materials = newMaterials;
             }
         }
+    }
+    
+    public void _UpdateCallSafety(bool safetyCalled)
+    {
+        callSafetyRenderer.material = safetyCalled ? callSafetyOn : callSafetyOff;
     }
 }
