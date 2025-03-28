@@ -60,8 +60,8 @@ public class DesktopManager : UdonSharpBehaviour
         table = table_;
         cursorClampX = table.k_TABLE_WIDTH;
         cursorClampZ = table.k_TABLE_HEIGHT;
-        Transform callShot = table.transform.Find("intl.desktop/desktop/desktop_callShot");
-        Transform pushOut = table.transform.Find("intl.desktop/desktop/desktop_pushOut");
+        // Transform callShot = table.transform.Find("intl.desktop/desktop/desktop_callShot");
+        // Transform pushOut = table.transform.Find("intl.desktop/desktop/desktop_pushOut");
     }
 
     public void _OnGameStarted()

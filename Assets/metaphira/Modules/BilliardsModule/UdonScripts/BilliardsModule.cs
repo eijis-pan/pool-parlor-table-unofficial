@@ -1483,11 +1483,16 @@ public class BilliardsModule : UdonSharpBehaviour
         graphicsManager._DisablePointPocketMarker();
 
         disablePlayComponents();
+        
+        markerCalledBall.SetActive(false);
+        nextBallRepositionStateLocal = 0;
+        _UpdateNextBallRepositionSpotMarker();
 
         this.transform.Find("intl.controls/undo").gameObject.SetActive(false);
         this.transform.Find("intl.controls/redo").gameObject.SetActive(false);
         this.transform.Find("intl.controls/skipturn").gameObject.SetActive(false);
         this.transform.Find("intl.controls/callShotLock").gameObject.SetActive(false);
+        this.transform.Find("intl.controls/pushOut").gameObject.SetActive(false);
 
         // Remove any access rights
         localPlayerId = -1;

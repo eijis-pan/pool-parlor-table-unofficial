@@ -875,6 +875,8 @@ int uniform_cue_colour;
         table.transform.Find("intl.controls/undo").gameObject.SetActive(false);
         table.transform.Find("intl.controls/redo").gameObject.SetActive(false);
         table.transform.Find("intl.controls/skipturn").gameObject.SetActive(false);
+        table.transform.Find("intl.controls/callShotLock").gameObject.SetActive(false);
+        table.transform.Find("intl.controls/pushOut").gameObject.SetActive(false);
         _HideTimers();
         
         _DisablePointPocketMarker();
@@ -1007,7 +1009,7 @@ int uniform_cue_colour;
                     (callShotLock ? calledPocketCalledWhite :
                         (table.teamIdLocal ^ table.teamColorLocal) == 0 ? calledPocketCalledBlue : calledPocketCalledOrange);
             }
-            table.pointPocketMarkerNoCall[i].SetActive(!enable && ! callShotLock);
+            table.pointPocketMarkerNoCall[i].SetActive(!enable && !callShotLock);
             table.pointPocketMarkerCalled[i].SetActive(enable);
             // table.pointPocketMarkers[i].SetActive(enable);
         }
