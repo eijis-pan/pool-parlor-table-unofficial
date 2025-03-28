@@ -19,6 +19,7 @@
 // #define TKCH_DEBUG_NEXTBALL_REPOSITION_STATE
 #define TKCH_CALLSHOT_CALLEDPBALL_DELAY
 #define TKCH_CALLSHOT_CALLEDPOCKET_DELAY
+// #define TKCH_CALLSHOT_ALLOW_UNSELECT
 
 using UdonSharp;
 using UnityEngine;
@@ -676,7 +677,11 @@ public class BilliardsModule : UdonSharpBehaviour
         calledBalls |= 0x1u << id;
         if (calledBalls == calledBallsLocal)
         {
+#if TKCH_CALLSHOT_ALLOW_UNSELECT
             calledBalls ^= 0x1u << id;
+#else
+            return;
+#endif
         }
 
         if (!callShotOprationOverwriteModeLocal){
@@ -752,7 +757,11 @@ public class BilliardsModule : UdonSharpBehaviour
         pointPockets |= 0x1u << id;
         if (pointPockets == pointPocketsLocal)
         {
+#if TKCH_CALLSHOT_ALLOW_UNSELECT
             pointPockets ^= 0x1u << id;
+#else
+            return;
+#endif
         }
 
         if (!callShotOprationOverwriteModeLocal){

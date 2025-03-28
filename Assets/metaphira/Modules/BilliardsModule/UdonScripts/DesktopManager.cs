@@ -1,4 +1,6 @@
-﻿// #define EIJIS_DEBUG_BALLORDER
+﻿// #define TKCH_CALLSHOT_ALLOW_UNSELECT
+
+// #define EIJIS_DEBUG_BALLORDER
 
 using System;
 using Metaphira.Modules.CameraOverride;
@@ -327,7 +329,11 @@ public class DesktopManager : UdonSharpBehaviour
                 int next = current + (asc ? 1 : -1);
                 if (next < 0 || pocketCount <= next)
                 {
+#if TKCH_CALLSHOT_ALLOW_UNSELECT
                     id = i;
+#else
+                    id = pocketOrder[(asc ? 0 : pocketOrder.Length - 1)];
+#endif
                     break;
                 }
 
@@ -495,8 +501,11 @@ public class DesktopManager : UdonSharpBehaviour
 #endif
         if (nearest_x == float.MaxValue || nearest_x == float.MinValue)
         {
-            // id = farestId;
+#if TKCH_CALLSHOT_ALLOW_UNSELECT
             id = orig;
+#else
+            id = farestId;
+#endif
         }
 
         return id;
