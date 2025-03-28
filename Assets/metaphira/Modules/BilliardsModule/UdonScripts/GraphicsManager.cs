@@ -57,7 +57,7 @@ public class GraphicsManager : UdonSharpBehaviour
 
     private Color gripColorActive = new Color(0.0f, 0.5f, 1.1f, 1.0f);
     private Color gripColorInactive = new Color(0.34f, 0.34f, 0.34f, 1.0f);
-    private Color gripColorCalled = new Color(0.0f, 1.0f, 0.0f, 1.0f);
+    private Color gripColorNoCall = new Color(1.0f, 1.0f, 0.0f, 1.0f);
 
     private BilliardsModule table;
 
@@ -615,9 +615,7 @@ int uniform_cue_colour;
 
     public void _UpdateCueGrip()
     {
-        Color activeCueGripColor = (table.calledBallsLocal != 0 && table.pointPocketsLocal != 0)
-            ? gripColorCalled
-            : gripColorActive;
+        Color activeCueGripColor = table.CanShotCondition() ? gripColorActive : gripColorNoCall;
 
         if (table.isPracticeMode)
         {

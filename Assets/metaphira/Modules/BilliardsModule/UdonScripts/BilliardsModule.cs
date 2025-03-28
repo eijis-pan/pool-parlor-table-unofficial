@@ -3936,6 +3936,11 @@ public class BilliardsModule : UdonSharpBehaviour
 
         return false;
     }
+
+    public bool CanShotCondition()
+    {
+        return (!isRotation || !afterBreak || safetyCalledLocal || (calledBallsLocal != 0 && pointPocketsLocal != 0));
+    }
     #endregion
 
     public void UpdateScoreSyncRowsByFlags(/* bool foulCountClear, bool foulCountIncrement */)

@@ -192,7 +192,8 @@ public class DesktopManager : UdonSharpBehaviour
             }
             else
             {
-                if (Input.GetKey(KeyCode.Mouse0))
+                // if (Input.GetKey(KeyCode.Mouse0))
+                if (Input.GetKey(KeyCode.Mouse0) && table.CanShotCondition())
                 {
                     if (!isShooting)
                     {

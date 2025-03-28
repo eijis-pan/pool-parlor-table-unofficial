@@ -120,7 +120,8 @@ public class StandardPhysicsManager : UdonSharpBehaviour
 
             Vector3 cueball_pos = balls_P[0];
 
-            if (table.canHitCueBall && !isContact)
+            // if (table.canHitCueBall && !isContact)
+            if (table.canHitCueBall && !isContact && table.CanShotCondition())
             {
                 float sweep_time_ball = Vector3.Dot(cueball_pos - cue_llpos, cue_vdir);
 
@@ -185,7 +186,8 @@ public class StandardPhysicsManager : UdonSharpBehaviour
                 // Get where the cue will strike the ball
                 if (_phy_ray_sphere(lpos2, cue_vdir, cueball_pos))
                 {
-                    if (!table.noGuidelineLocal)
+                    // if (!table.noGuidelineLocal)
+                    if (!table.noGuidelineLocal && table.CanShotCondition())
                     {
                         table.guideline.SetActive(true);
                         table.devhit.SetActive(true);
