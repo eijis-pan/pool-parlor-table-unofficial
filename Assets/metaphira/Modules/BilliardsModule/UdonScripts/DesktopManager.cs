@@ -418,6 +418,10 @@ public class DesktopManager : UdonSharpBehaviour
 #if EIJIS_DEBUG_BALLORDER
         table._LogInfo($"  before called ball id = {id}");
 #endif
+        if (id < 0)
+        {
+            return table.findLowestUnpocketedBall(table.ballsPocketedLocal);
+        }
         int orig = id;
 
         uint ballsPocketed = table.ballsPocketedLocal;
