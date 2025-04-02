@@ -34,8 +34,8 @@ public class MenuManager : UdonSharpBehaviour
     [SerializeField] public UIButton buttonTeamsToggle;
     [SerializeField] public UIButton buttonGuidelineToggle;
     [SerializeField] public UIButton buttonLockingToggle;
-    [SerializeField] public UIButton buttonRackSheet;
-    [SerializeField] public UIButton buttonWoodFrame;
+    [SerializeField] public UIButton buttonRackSheetToggle;
+    [SerializeField] public UIButton buttonWoodFrameToggle;
     // [SerializeField] public UIButton buttonSemiAutoCallBallToggle;
     // [SerializeField] public UIButton buttonSemiAutoCallPocketToggle;
     [SerializeField] public UIButton buttonSemiAutoCallToggle;
@@ -256,19 +256,19 @@ public class MenuManager : UdonSharpBehaviour
         buttonTeamsToggle._SetButtonToggle(table.teamsLocal);
         buttonGuidelineToggle._SetButtonToggle(!table.noGuidelineLocal);
         buttonLockingToggle._SetButtonToggle(!table.noLockingLocal);
-        buttonRackSheet._ResetPushButton();
-        buttonWoodFrame._ResetPushButton();
+        buttonRackSheetToggle._ResetPushButton();
+        buttonWoodFrameToggle._ResetPushButton();
         // buttonSemiAutoCallBallToggle._SetButtonToggle(table.semiAutoCallBallLocal);
         // buttonSemiAutoCallPocketToggle._SetButtonToggle(table.semiAutoCallPocketLocal);
         buttonSemiAutoCallToggle._SetButtonToggle(table.semiAutoCallLocal);
         buttonCallPassOptionToggle._SetButtonToggle(table.callPassOptionLocal);
         if (table.rackConditionLocal == 0)
         {
-            buttonRackSheet._SetButtonPushed();
+            buttonRackSheetToggle._SetButtonPushed();
         }
         else
         {
-            buttonWoodFrame._SetButtonPushed();
+            buttonWoodFrameToggle._SetButtonPushed();
         }
 
         _RefreshPlayerList();
@@ -292,8 +292,8 @@ public class MenuManager : UdonSharpBehaviour
         buttonLockingToggle.disableInteractions = isNormalPlayer;
         buttonTimerLeft.disableInteractions = isNormalPlayer;
         buttonTimerRight.disableInteractions = isNormalPlayer;
-        buttonRackSheet.disableInteractions = isNormalPlayer;
-        buttonWoodFrame.disableInteractions = isNormalPlayer;
+        buttonRackSheetToggle.disableInteractions = isNormalPlayer;
+        buttonWoodFrameToggle.disableInteractions = isNormalPlayer;
         // buttonSemiAutoCallBallToggle.disableInteractions = isNormalPlayer;
         // buttonSemiAutoCallPocketToggle.disableInteractions = isNormalPlayer;
         buttonSemiAutoCallToggle.disableInteractions = isNormalPlayer;
@@ -386,14 +386,14 @@ public class MenuManager : UdonSharpBehaviour
             {
                 table._TriggerNoLockingChanged(!button.toggleState);
             }
-            else if (button.name == "RackSheet")
+            else if (button.name == "RackSheetToggle")
             {
 #if TKCH_DEBUG_TOGGLE
                 table._LogInfo($"  name = {button.name}, toggleState = {button.toggleState}");
 #endif
                 table._TriggerRackCondisionChanged(0);
             }
-            else if (button.name == "WoodFrame")
+            else if (button.name == "WoodFrameToggle")
             {
 #if TKCH_DEBUG_TOGGLE
                 table._LogInfo($"  name = {button.name}, toggleState = {button.toggleState}");
