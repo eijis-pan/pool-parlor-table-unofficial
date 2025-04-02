@@ -1,4 +1,5 @@
 ﻿//#define TKCH_DEBUG_TOGGLE
+// #define TKCH_DEBUG_INITIAL_STATE
 
 using System;
 using UdonSharp;
@@ -53,7 +54,12 @@ public class MenuManager : UdonSharpBehaviour
 
     public void _Init(BilliardsModule table_)
     {
+#if TKCH_DEBUG_INITIAL_STATE
+        table_._LogInfo("TKCH MenuManager::_Init()");
+#endif
         table = table_;
+        
+        button120Win._Init();
         
         _RefreshTimer();
         _RefreshToggleSettings();
@@ -87,6 +93,10 @@ public class MenuManager : UdonSharpBehaviour
     // View gamemode changes
     public void _RefreshGameMode()
     {
+#if TKCH_DEBUG_INITIAL_STATE
+        table._LogInfo($"TKCH MenuManager::_RefreshGameMode() gameModeLocal = {table.gameModeLocal}, goalPointsLocal = {table.goalPointsLocal}");
+        table._LogInfo($"  button120Win.toggleState = {button120Win.toggleState}");
+#endif
         uint menuGameMode = table.gameModeLocal;
         int goalPoints = table.goalPointsLocal;
 

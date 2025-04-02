@@ -1,4 +1,6 @@
-﻿using System;
+﻿// #define TKCH_DEBUG_INITIAL_STATE
+
+using System;
 using UdonSharp;
 using UnityEngine;
 using VRC.SDKBase;
@@ -38,8 +40,23 @@ public class UIButton : UdonSharpBehaviour
     private Vector3 pressedPosition;
     private Vector3 depressedPosition;
 
+    private bool initialized = false;
+    
     private void Start()
     {
+        _Init();
+    }
+
+    public void _Init()
+    {
+#if TKCH_DEBUG_INITIAL_STATE
+        Debug.Log($"TKCH UIButton::Start() name = {name}, initialized = {initialized}");
+#endif
+
+        if(initialized) return;
+
+        initialized = true;
+
         visual = this.transform.Find("Visual").gameObject;
         button = this.transform.Find("Visual/Button").gameObject;
         desktopOutline = this.transform.Find("Visual/DesktopOutline").gameObject;
@@ -387,6 +404,9 @@ public class UIButton : UdonSharpBehaviour
 
     public void _SetButtonPushed()
     {
+#if TKCH_DEBUG_INITIAL_STATE
+        Debug.Log($"TKCH UIButton::_SetButtonPushed() button.name = {name}");
+#endif
         if (!button) return;
         if (buttonState != STATE_INACTIVE) return;
 
