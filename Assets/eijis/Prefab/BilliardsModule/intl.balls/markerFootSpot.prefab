@@ -28,7 +28,7 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7452830087596409227}
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0.5334, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
@@ -93,8 +93,8 @@ BoxCollider:
   m_IsTrigger: 1
   m_Enabled: 1
   serializedVersion: 2
-  m_Size: {x: 0.07, y: 0.15, z: 0.07}
-  m_Center: {x: -0.00000011920929, y: 0.16, z: 0.000000005587937}
+  m_Size: {x: 0.12, y: 0.12, z: 0.12}
+  m_Center: {x: 0, y: 0.2, z: 0}
 --- !u!114 &7452830087596409334
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -131,7 +131,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   interactTextPlacement: {fileID: 0}
-  interactText: head side ball to here
+  interactText: next ball here
   interactTextGO: {fileID: 0}
   proximity: 1
   SynchronizePosition: 0

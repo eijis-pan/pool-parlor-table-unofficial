@@ -4006,7 +4006,7 @@ public class BilliardsModule : UdonSharpBehaviour
             uint[] encodeScoreSyncValues = null;
             if (teamId == teamIdLocal)
             {
-                int maxChainedPoint = scoreScreen.GetTeamSafeNoPocketShotCount(teamId);
+                int maxChainedPoint = scoreScreen.GetTeamShotCount(teamId);
                 if (maxChainedPoint < chainedPointsLocal[teamIdLocal]) {maxChainedPoint = chainedPointsLocal[teamIdLocal];}
 
                 encodeScoreSyncValues = scoreScreen.EncodeScoreParams(

@@ -1,22 +1,12 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1001 &187765245396836364
+--- !u!1001 &5093221611922899645
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Modification:
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 2727735381402847643, guid: 1b0fa98e0b2e1754eb13dbec4586f1de,
-        type: 3}
-      propertyPath: m_Materials.Array.data[0]
-      value: 
-      objectReference: {fileID: 0}
-    - target: {fileID: 2727735381979683027, guid: 1b0fa98e0b2e1754eb13dbec4586f1de,
-        type: 3}
-      propertyPath: m_Materials.Array.data[0]
-      value: 
-      objectReference: {fileID: 0}
     - target: {fileID: 2727735383249887168, guid: 1b0fa98e0b2e1754eb13dbec4586f1de,
         type: 3}
       propertyPath: m_RootOrder
@@ -25,7 +15,7 @@ PrefabInstance:
     - target: {fileID: 2727735383249887168, guid: 1b0fa98e0b2e1754eb13dbec4586f1de,
         type: 3}
       propertyPath: m_LocalPosition.x
-      value: -0.288
+      value: -0.372
       objectReference: {fileID: 0}
     - target: {fileID: 2727735383249887168, guid: 1b0fa98e0b2e1754eb13dbec4586f1de,
         type: 3}
@@ -75,13 +65,13 @@ PrefabInstance:
     - target: {fileID: 2727735383249887171, guid: 1b0fa98e0b2e1754eb13dbec4586f1de,
         type: 3}
       propertyPath: m_Name
-      value: SemiAutoCallToggle
+      value: CallPassOptionToggle
       objectReference: {fileID: 0}
     - target: {fileID: 2727735383249887175, guid: 1b0fa98e0b2e1754eb13dbec4586f1de,
         type: 3}
       propertyPath: buttonOn
       value: 
-      objectReference: {fileID: 2800000, guid: 042f1f7c9de5e954fb4a9e9495bb4e45, type: 3}
+      objectReference: {fileID: 2800000, guid: 265fdde34a4ab154a87c44376ba74426, type: 3}
     - target: {fileID: 2727735383249887175, guid: 1b0fa98e0b2e1754eb13dbec4586f1de,
         type: 3}
       propertyPath: callback
@@ -91,7 +81,7 @@ PrefabInstance:
         type: 3}
       propertyPath: buttonOff
       value: 
-      objectReference: {fileID: 2800000, guid: 00d01c78dfcbf2d4b866dd0f27d22179, type: 3}
+      objectReference: {fileID: 2800000, guid: bf1652e8bd0e42a4a8c40954299912fd, type: 3}
     - target: {fileID: 2727735383249887175, guid: 1b0fa98e0b2e1754eb13dbec4586f1de,
         type: 3}
       propertyPath: serializationData.Prefab
