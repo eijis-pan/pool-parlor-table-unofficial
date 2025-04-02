@@ -3939,7 +3939,7 @@ public class BilliardsModule : UdonSharpBehaviour
 
     public bool CanShotCondition()
     {
-        return (!isRotation || !afterBreak || safetyCalledLocal || (calledBallsLocal != 0 && pointPocketsLocal != 0));
+        return (!isRotation || !afterBreak || safetyCalledLocal || (calledBallsLocal != 0 && pointPocketsLocal != 0) || (pushOutStateLocal == PUSHOUT_DOING));
     }
     #endregion
 
