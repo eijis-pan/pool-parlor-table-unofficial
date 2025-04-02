@@ -4012,9 +4012,9 @@ public class BilliardsModule : UdonSharpBehaviour
                 encodeScoreSyncValues = scoreScreen.EncodeScoreParams(
                     totalPointsLocal[teamId],
                     chainedFoulsLocal[teamIdLocal], // (foulCountClear ? 0 : scoreScreen.GetTeamScratchCount(teamId) + (foulCountIncrement ? 1 : 0)),
-                    winRackCountLocal[teamId],
                     inningCountLocal + 1, // turn count
                     maxChainedPoint, // high run
+                    winRackCountLocal[teamId],
                     0 // no use
                 );
             }
