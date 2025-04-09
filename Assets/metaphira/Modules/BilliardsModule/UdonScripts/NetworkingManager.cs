@@ -667,6 +667,19 @@ public class NetworkingManager : UdonSharpBehaviour
     public void _OnGameModeChanged(uint newGameMode)
     {
         gameModeSynced = (byte)newGameMode;
+        if (gameModeSynced == BilliardsModule.GAMEMODE_ROTATION_15)
+        {
+            if (goalPointsSynced < 90) goalPointsSynced = 90;
+        }
+        else if (gameModeSynced == BilliardsModule.GAMEMODE_ROTATION_10 || goalPointsSynced == BilliardsModule.GAMEMODE_ROTATION_9)
+        {
+            if (goalPointsSynced < 60) goalPointsSynced = 60;
+            else if (180 < goalPointsSynced) goalPointsSynced = 180;
+        }
+        else if (gameModeSynced == BilliardsModule.GAMEMODE_ROTATION_6)
+        {
+            if (120 < goalPointsSynced) goalPointsSynced = 120;
+        }
 
         bufferMessages(false);
     }

@@ -59,11 +59,18 @@ namespace EijisPoolParlorTableUtil
 				"intl.menu/SettingsMenu",
 				new []
 				{
-					"60Win",
-					"90Win",
-					"120Win",
-					"180Win",
-					"240Win",
+					"Goals6",
+					"Goals9",
+					"Goals15",
+					// "60Win",
+					// "90Win",
+					// "120Win",
+					// "180Win",
+					// "240Win",
+					"6Balls",
+					"9Balls",
+					"10Balls",
+					"15Balls",
 					"RackSheetToggle",
 					"WoodFrameToggle",
 					"SemiAutoCallToggle",
@@ -166,15 +173,61 @@ namespace EijisPoolParlorTableUtil
 
 		public static readonly Dictionary<string, string> SetMenuManagerUIButtonProperties = new Dictionary<string, string>
 		{
-			{ "button60Win", "intl.menu/SettingsMenu/60Win" },
-			{ "button90Win", "intl.menu/SettingsMenu/90Win" },
-			{ "button120Win", "intl.menu/SettingsMenu/120Win" },
-			{ "button180Win", "intl.menu/SettingsMenu/180Win" },
-			{ "button240Win", "intl.menu/SettingsMenu/240Win" },
+			{ "button40Win", "intl.menu/SettingsMenu/Goals6/40Win" },
+			// { "button60Win", "intl.menu/SettingsMenu/60Win" },
+			// { "button90Win", "intl.menu/SettingsMenu/90Win" },
+			// { "button120Win", "intl.menu/SettingsMenu/120Win" },
+			// { "button180Win", "intl.menu/SettingsMenu/180Win" },
+			{ "button240Win", "intl.menu/SettingsMenu/Goals15/240Win" },
+			{ "rotation6ButtonsGroup", "intl.menu/SettingsMenu/Goals6" },
+			{ "rotation9ButtonsGroup", "intl.menu/SettingsMenu/Goals9" },
+			{ "rotation15ButtonsGroup", "intl.menu/SettingsMenu/Goals15" },
+			{ "button6BallsToggle", "intl.menu/SettingsMenu/6Balls" },
+			{ "button9BallsToggle", "intl.menu/SettingsMenu/9Balls" },
+			{ "button10BallsToggle", "intl.menu/SettingsMenu/10Balls" },
+			{ "button15BallsToggle", "intl.menu/SettingsMenu/15Balls" },
 			{ "buttonRackSheetToggle", "intl.menu/SettingsMenu/RackSheetToggle" },
 			{ "buttonWoodFrameToggle", "intl.menu/SettingsMenu/WoodFrameToggle" },
 			{ "buttonSemiAutoCallToggle", "intl.menu/SettingsMenu/SemiAutoCallToggle" },
 			{ "buttonCallPassOptionToggle", "intl.menu/SettingsMenu/CallPassOptionToggle" }
+		};
+
+		public static readonly Dictionary<string, string[]> SetMenuManagerUIButtonArrayProperties = new Dictionary<string, string[]>
+		{
+			{ 
+				"button60Win", 
+				new []
+				{
+					"intl.menu/SettingsMenu/Goals6/60Win",
+					"intl.menu/SettingsMenu/Goals9/60Win"
+				}
+			},
+			{ 
+				"button90Win", 
+				new []
+				{
+					"intl.menu/SettingsMenu/Goals6/90Win",
+					"intl.menu/SettingsMenu/Goals9/90Win",
+					"intl.menu/SettingsMenu/Goals15/90Win"
+				}
+			},
+			{ 
+				"button120Win", 
+				new []
+				{
+					"intl.menu/SettingsMenu/Goals6/120Win",
+					"intl.menu/SettingsMenu/Goals9/120Win",
+					"intl.menu/SettingsMenu/Goals15/120Win"
+				}
+			},
+			{ 
+				"button180Win", 
+				new []
+				{
+					"intl.menu/SettingsMenu/Goals9/180Win",
+					"intl.menu/SettingsMenu/Goals15/180Win"
+				}
+			}
 		};
 
 		private static readonly Type[] SetTableReferenceComponents =
@@ -487,6 +540,35 @@ namespace EijisPoolParlorTableUtil
 
 				menuManagerSerializedObject.FindProperty(kvp.Key).objectReferenceValue = tr.gameObject;
 			}
+			foreach (var kvp in SetMenuManagerUIButtonArrayProperties)
+			{
+				var arrayProp = menuManagerSerializedObject.FindProperty(kvp.Key);
+				if (ReferenceEquals(null, arrayProp) /* || arrayProp.arraySize == 0 */ )
+				{
+					continue;
+				}
+
+				arrayProp.arraySize = kvp.Value.Length;
+				//GameObject[] gameObjectArray = new GameObject[kvp.Value.Length];
+				int gameObjectArrayIndex = 0;
+				foreach (var path in kvp.Value)
+				{
+					var tr = _BilliardsModule.transform.Find(path);
+					if (ReferenceEquals(null, tr))
+					{
+						continue;
+					}
+
+					//gameObjectArray[gameObjectArrayIndex++] = tr.gameObject;
+					var itemProp = arrayProp.GetArrayElementAtIndex(gameObjectArrayIndex++);
+					if (ReferenceEquals(null, itemProp))
+					{
+						break;
+					}
+					itemProp.objectReferenceValue = tr.gameObject;
+				}
+				//graphicsManagerSerializedObject.FindProperty(kvp.Key).objectReferenceValue = gameObjectArray;
+			}
 			menuManagerSerializedObject.ApplyModifiedProperties();
 			
 			foreach (var disableGameObject in SetDisableGameObjects)
@@ -605,12 +687,17 @@ namespace EijisPoolParlorTableUtil
                 { "TimeRight", new MenuButtonDef { TextureName = "TriangleOnTemplate.psd", DesktopOutline = _desktopOutline }},
                 { "TimeLeft", new MenuButtonDef { TextureName = "TriangleOnTemplate.psd", DesktopOutline = _desktopOutline }},
                 { "StartButton", new MenuButtonDef { TextureName = "Play.psd", DesktopOutline = _desktopOutline }},
+                { "6Balls", new MenuButtonDef { TextureName = "6BallsOff.psd", DesktopOutline = _desktopOutline }},
+                { "9Balls", new MenuButtonDef { TextureName = "9BallsOff.psd", DesktopOutline = _desktopOutline }},
+                { "10Balls", new MenuButtonDef { TextureName = "10BallsOff.psd", DesktopOutline = _desktopOutline }},
+                { "15Balls", new MenuButtonDef { TextureName = "15BallsOff.psd", DesktopOutline = _desktopOutline }},
                 { "RackSheetToggle", new MenuButtonDef { TextureName = "RackSheetOff.psd", DesktopOutline = _desktopOutline }},
                 { "WoodFrameToggle", new MenuButtonDef { TextureName = "WoodFrameOff.psd", DesktopOutline = _desktopOutline }},
                 { "SemiAutoCallToggle", new MenuButtonDef { TextureName = "SemiAutoCallOff.psd", DesktopOutline = _desktopOutline }},
                 { "SemiAutoCallBallToggle", new MenuButtonDef { TextureName = "SemiAutoCallBallOff.psd", DesktopOutline = _desktopOutline }},
                 { "SemiAutoCallPocketToggle", new MenuButtonDef { TextureName = "SemiAutoCallPocketOff.psd", DesktopOutline = _desktopOutline }},
                 { "CallPassOptionToggle", new MenuButtonDef { TextureName = "CallPassOptionOff.psd", DesktopOutline = _desktopOutline }},
+                { "40Win", new MenuButtonDef { TextureName = "40WinOff.psd", DesktopOutline = _desktopOutline }},
                 { "60Win", new MenuButtonDef { TextureName = "60WinOff.psd", DesktopOutline = _desktopOutline }},
                 { "90Win", new MenuButtonDef { TextureName = "90WinOff.psd", DesktopOutline = _desktopOutline }},
                 { "120Win", new MenuButtonDef { TextureName = "120WinOff.psd", DesktopOutline = _desktopOutline }},
@@ -618,7 +705,7 @@ namespace EijisPoolParlorTableUtil
                 { "240Win", new MenuButtonDef { TextureName = "240WinOff.psd", DesktopOutline = _desktopOutline }}
             };
 
-            foreach (var menuPath in new string[] { "intl.menu/SettingsMenu", "intl.menu/StartMenu" })
+            foreach (var menuPath in new string[] { "intl.menu/SettingsMenu", "intl.menu/StartMenu", "intl.menu/SettingsMenu/Goals15", "intl.menu/SettingsMenu/Goals9", "intl.menu/SettingsMenu/Goals6" })
             {
                 var menuTr = billiardsModule.transform.Find(menuPath);
                 foreach ( KeyValuePair<string, MenuButtonDef> kvp in menuButtonDefDict)

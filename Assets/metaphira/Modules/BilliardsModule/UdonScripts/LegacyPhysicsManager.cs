@@ -1,4 +1,5 @@
-﻿
+﻿#define TKCH_6BALL_HIDE8
+
 using System;
 using UdonSharp;
 using UnityEngine;
@@ -583,10 +584,36 @@ public class LegacyPhysicsManager : UdonSharpBehaviour
                 }
             }
         }
-        else if (table.is9Ball) // 9
+        else if (table.is9Ball || table.isRotation9Balls) // 9
         {
             // Only check to 9 ball
             for (int i = 1; i <= 9; i++)
+            {
+                if ((balls_P[0] - balls_P[i]).sqrMagnitude < k_BALL_DSQR)
+                {
+                    return true;
+                }
+            }
+        }
+        else if (table.isRotation10Balls) // 10
+        {
+            // Only check to 10 ball
+            for (int i = 1; i <= 10; i++)
+            {
+                if ((balls_P[0] - balls_P[i]).sqrMagnitude < k_BALL_DSQR)
+                {
+                    return true;
+                }
+            }
+        }
+        else if (table.isRotation6Balls) // 6
+        {
+            // Only check to 6 ball
+#if TKCH_6BALL_HIDE8
+            for (int i = 2; i <= 7; i++)
+#else
+            for (int i = 1; i <= 6; i++)
+#endif
             {
                 if ((balls_P[0] - balls_P[i]).sqrMagnitude < k_BALL_DSQR)
                 {

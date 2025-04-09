@@ -21,6 +21,7 @@
 #define TKCH_CALLSHOT_CALLEDPBALL_DELAY
 #define TKCH_CALLSHOT_CALLEDPOCKET_DELAY
 // #define TKCH_CALLSHOT_ALLOW_UNSELECT
+#define TKCH_6BALL_HIDE8
 
 using UdonSharp;
 using UnityEngine;
@@ -35,6 +36,12 @@ public class BilliardsModule : UdonSharpBehaviour
 {
     [NonSerialized] public readonly string[] DEPENDENCIES = new string[] { nameof(CameraOverrideModule) };
     [NonSerialized] public readonly string VERSION = "6.0.0 rotation";
+
+    [NonSerialized] public const uint GAME_MODE_ROTATION_MASK = 0x3u;
+    [NonSerialized] public const uint GAMEMODE_ROTATION_15 = 4u;
+    [NonSerialized] public const uint GAMEMODE_ROTATION_10 = 5u;
+    [NonSerialized] public const uint GAMEMODE_ROTATION_9 = 6u;
+    [NonSerialized] public const uint GAMEMODE_ROTATION_6 = 7u;
 
     // table model properties
     [NonSerialized] public float k_TABLE_WIDTH; // horizontal span of table
@@ -93,8 +100,8 @@ public class BilliardsModule : UdonSharpBehaviour
     // globals
     [NonSerialized] public AudioSource aud_main;
     [NonSerialized] public UdonBehaviour callbacks;
-    private Vector3[][] initialPositions = new Vector3[5][];
-    private uint[] initialBallsPocketed = new uint[5];
+    private Vector3[][] initialPositions = new Vector3[8][];
+    private uint[] initialBallsPocketed = new uint[8];
 
     // constants
     private const float k_BALL_RADIUS = 0.03f;
@@ -106,10 +113,20 @@ public class BilliardsModule : UdonSharpBehaviour
     private const float k_SPOT_CAROM_X = 0.8001f; // Spot position for carom mode
     private const float k_SPOT_RORATION_FREEBALL_X = k_SPOT_CAROM_X - k_SPOT_POSITION_X; // Rotationの完全フリーボールの初期位置はセンターからずらす
     private readonly int[] break_order_8ball = { 9, 2, 10, 11, 1, 3, 4, 12, 5, 13, 14, 6, 15, 7, 8 };
-    private readonly int[] break_order_rotation = { 2, 8, 1, 11, 12, 13, 9, 14, 15, 10, 3, 5, 6, 7, 4 };
+    private readonly int[] break_order_rotation_15ball = { 2, 8, 1, 11, 12, 13, 9, 14, 15, 10, 3, 5, 6, 7, 4 };
+    private readonly int[] break_order_rotation_10ball = { 2, 7, 8, 1, 10, 9, 3, 5, 6, 4 };
+    private readonly int[] break_order_rotation_9ball = { 2, 6, 7, 8, 9, 1, 3, 4, 5 };
+#if TKCH_6BALL_HIDE8
+    private readonly int[] break_order_rotation_6ball = { 2, 5, 6, 3, 7, 4 };
+    private readonly uint[] rotation_pocket_masks = { 0xFFFEu, 0x07FEu, 0x3FEu, 0xFCu };
+    private readonly uint[] rotation_initial_pocketed = { 0x0000u, 0xF800u, 0xFC00u, 0xFF02u };
+#else
+    private readonly int[] break_order_rotation_6ball = { 2, 5, 6, 3, 1, 4 };
+    private readonly uint[] rotation_pocket_masks = { 0xFFFEu, 0x07FEu, 0x3FEu, 0x7Eu };
+    private readonly uint[] rotation_initial_pocketed = { 0x0000u, 0xF800u, 0xFC00u, 0xFF80u };
+#endif
     private readonly int[] break_order_9ball = { 2, 3, 4, 5, 9, 6, 7, 8, 1 };
     private readonly int[] break_rows_9ball = { 0, 1, 2, 1, 0 };
-    private readonly uint rotation_pocket_mask = 0xFFFEu;
 #if TKCH_DEBUG_SEMIAUTO_CALL_FINDLOGIC || TKCH_DEBUG_SEMIAUTO_CALL_SIDE ||TKCH_DEBUG_NEXT_BREAK
     private bool debugLogFlg = false;
 #endif
@@ -337,6 +354,10 @@ public class BilliardsModule : UdonSharpBehaviour
     [NonSerialized] public bool isJp4Ball = false;
     [NonSerialized] public bool isKr4Ball = false;
     [NonSerialized] public bool isRotation = false;
+    [NonSerialized] public bool isRotation15Balls = false;
+    [NonSerialized] public bool isRotation10Balls = false;
+    [NonSerialized] public bool isRotation9Balls = false;
+    [NonSerialized] public bool isRotation6Balls = false;
     [NonSerialized] public bool isPracticeMode = false;
     [NonSerialized] public CameraOverrideModule cameraOverrideModule;
     public string[] moderators = new string[0];
@@ -1196,6 +1217,7 @@ public class BilliardsModule : UdonSharpBehaviour
         // _LogInfo($"onRemoteGameSettingsUpdated gameMode={gameModeSynced} goalPoints={goalPointsSynced} timer={timerSynced} teams={teamsSynced} guideline={!noGuidelineSynced} locking={!noLockingSynced} rackCondition={rackConditionSynced} semiAutoCallBall={semiAutoCallBallSynced} semiAutoCallPocket={semiAutoCallPocketSynced}");
         _LogInfo($"onRemoteGameSettingsUpdated gameMode={gameModeSynced} goalPoints={goalPointsSynced} timer={timerSynced} teams={teamsSynced} guideline={!noGuidelineSynced} locking={!noLockingSynced} rackCondition={rackConditionSynced} semiAutoCall={semiAutoCallSynced} callPassOption={callPassOptionSynced}");
 
+        bool refreshToggles = false;
         if (gameModeLocal != gameModeSynced || goalPointsLocal != goalPointsSynced)
         {
             gameModeLocal = gameModeSynced;
@@ -1206,7 +1228,12 @@ public class BilliardsModule : UdonSharpBehaviour
             isJp4Ball = gameModeLocal == 2u;
             isKr4Ball = gameModeLocal == 3u;
             is4Ball = isJp4Ball || isKr4Ball;
-            isRotation = gameModeLocal == 4u;
+            isRotation15Balls = gameModeLocal == GAMEMODE_ROTATION_15;
+            isRotation10Balls = gameModeLocal == GAMEMODE_ROTATION_10;
+            isRotation9Balls = gameModeLocal == GAMEMODE_ROTATION_9;
+            isRotation6Balls = gameModeLocal == GAMEMODE_ROTATION_6;
+            refreshToggles = true;
+            isRotation = isRotation15Balls || isRotation10Balls || isRotation9Balls || isRotation6Balls;
 
             menuManager._RefreshGameMode();
         }
@@ -1218,7 +1245,6 @@ public class BilliardsModule : UdonSharpBehaviour
             menuManager._RefreshTimer();
         }
 
-        bool refreshToggles = false;
         if (teamsLocal != teamsSynced)
         {
             teamsLocal = teamsSynced;
@@ -1405,7 +1431,7 @@ public class BilliardsModule : UdonSharpBehaviour
         requestBreakBlue.SetActive(false);
 
         // Effects
-        graphicsManager._PlayIntroAnimation((isRotation && networkingManager.repositionStateSynced == 3)? rotation_pocket_mask : 0xFFFFu);
+        graphicsManager._PlayIntroAnimation((isRotation && networkingManager.repositionStateSynced == 3)? rotation_pocket_masks[gameModeLocal & GAME_MODE_ROTATION_MASK] : 0xFFFFu);
         aud_main.PlayOneShot(snd_Intro, 1.0f);
 
         graphicsManager._SetScorecardPlayers(playerNamesLocal);
@@ -2016,7 +2042,10 @@ public class BilliardsModule : UdonSharpBehaviour
                     break;
                 }
                 break;
-            case 4:
+            case GAMEMODE_ROTATION_15:
+            case GAMEMODE_ROTATION_10:
+            case GAMEMODE_ROTATION_9:
+            case GAMEMODE_ROTATION_6:
                 if (firstHit == 0)
                 {
                     firstHit = dstId;
@@ -2061,10 +2090,10 @@ public class BilliardsModule : UdonSharpBehaviour
         uint total = 0U;
 
         // Get total for X positioning
-        int count_extent = is9Ball ? 10 : 16;
-        for (int i = 1; i < count_extent; i++)
+        uint pocketMask = isRotation ? rotation_pocket_masks[gameModeLocal & GAME_MODE_ROTATION_MASK] : (is9Ball ? 0x3FEu : 0xFFFFu);
+        for (int i = 1; i < 16; i++)
         {
-            total += (ballsPocketedLocal >> i) & 0x1U;
+            total += ((ballsPocketedLocal & pocketMask) >> i) & 0x1U;
         }
 
         // place ball on the rack
@@ -2308,10 +2337,17 @@ public class BilliardsModule : UdonSharpBehaviour
             }
             else if (isRotation)
             {
+                int ballsLength = (isRotation15Balls ? break_order_rotation_15ball.Length
+                    : (isRotation10Balls ? break_order_rotation_10ball.Length
+                        : (isRotation9Balls ? break_order_rotation_9ball.Length 
+                            : break_order_rotation_6ball.Length)));
+
+                uint pocketMask = rotation_pocket_masks[gameModeLocal & GAME_MODE_ROTATION_MASK];
+                
                 bool isWrongHit = !(findLowestUnpocketedBall(ballsPocketedOrig) == firstHit);
                 bool isNoTouch = firstHit <= 0;
 
-                bool isAnyPocketSink = (ballsPocketedLocal & rotation_pocket_mask) > (ballsPocketedOrig & rotation_pocket_mask);
+                bool isAnyPocketSink = (ballsPocketedLocal & pocketMask) > (ballsPocketedOrig & pocketMask);
                 
                 bool isNoCushon = !isAnyPocketSink && (
                                   // (!afterBreak && (SoftwareFallback(cushionObjectiveBallsOnBreak) < 4)) ||
@@ -2321,8 +2357,8 @@ public class BilliardsModule : UdonSharpBehaviour
                                  !afterBreak && (SoftwareFallback(cushionObjectiveBallsOnBreak) < 4);
 
                 foulCondition = isScratch || isWrongHit || isNoTouch || isNoCushon;
-                isObjectiveSink = (targetPocketedLocal & rotation_pocket_mask) > (targetPocketedOrig & rotation_pocket_mask);
-                isOpponentSink = (otherPocketedLocal & rotation_pocket_mask) > (otherPocketedOrig & rotation_pocket_mask);
+                isObjectiveSink = (targetPocketedLocal & pocketMask) > (targetPocketedOrig & pocketMask);
+                isOpponentSink = (otherPocketedLocal & pocketMask) > (otherPocketedOrig & pocketMask);
                 if (isObjectiveSink || !afterBreak)
                 {
                     isOpponentSink = false;
@@ -2344,7 +2380,11 @@ public class BilliardsModule : UdonSharpBehaviour
                 int point = 0;
                 if (isObjectiveSink || !afterBreak)
                 {
+#if TKCH_6BALL_HIDE8
+                    for (int i = (isRotation6Balls ? 2 : 1); i < (isRotation6Balls ? balls.Length + 1 : balls.Length); i++)
+#else
                     for (int i = 1; i < balls.Length; i++)
+#endif
                     {
                         if (0 < ((ballsPocketedCurrent >> i) & 0x1u))
                         {
@@ -2356,10 +2396,10 @@ public class BilliardsModule : UdonSharpBehaviour
                 
                 if (isOpponentSink || foulCondition)
                 {
-                    int uponBallsCount = pocketedballUponPool(ballsPocketedCurrent, k_SPOT_POSITION_X, break_order_rotation.Length);
+                    int uponBallsCount = pocketedballUponPool(ballsPocketedCurrent, k_SPOT_POSITION_X, ballsLength);
                     if (uponBallsCount <= 0)
                     {
-                        pocketedballUponPool(ballsPocketedCurrent, 0, break_order_rotation.Length);
+                        pocketedballUponPool(ballsPocketedCurrent, 0, ballsLength);
                     }
                 }
                 else
@@ -2370,7 +2410,7 @@ public class BilliardsModule : UdonSharpBehaviour
                     if (255 < chainedPointsLocal[teamIdLocal]) {chainedPointsLocal[teamIdLocal] = 255;}
                 }
 
-                winCondition = (ballsPocketedLocal & rotation_pocket_mask) == rotation_pocket_mask;
+                winCondition = (ballsPocketedLocal & pocketMask) == pocketMask;
                 if (winCondition)
                 {
                     float kitcyen_x = -k_SPOT_POSITION_X;
@@ -2583,17 +2623,40 @@ public class BilliardsModule : UdonSharpBehaviour
         
         {
             // rotation
-            initialBallsPocketed[4] = 0x00u;
+            for (uint gameMode = GAMEMODE_ROTATION_15; gameMode <= GAMEMODE_ROTATION_6; gameMode++)
+            {
+                initialBallsPocketed[gameMode] = rotation_initial_pocketed[gameMode & GAME_MODE_ROTATION_MASK];
+            }
 
+            // 15,10,6balls
             for (int i = 0, k = 0; i < 5; i++)
             {
                 for (int j = 0; j <= i; j++)
                 {
-                    initialPositions[4][break_order_rotation[k++]] = new Vector3
+                    Vector3 pos = new Vector3
                     (
                         k_SPOT_POSITION_X + i * k_BALL_PL_Y + (rackConditionLocal == 0 ? 0 : UnityEngine.Random.Range(-k_RANDOMIZE_F, k_RANDOMIZE_F)),
                         0.0f,
                         (-i + j * 2) * k_BALL_PL_X + (rackConditionLocal == 0 ? 0 : UnityEngine.Random.Range(-k_RANDOMIZE_F, k_RANDOMIZE_F))
+                    );
+                    if (k < break_order_rotation_15ball.Length) initialPositions[GAMEMODE_ROTATION_15][break_order_rotation_15ball[k]] = pos;
+                    if (k < break_order_rotation_10ball.Length) initialPositions[GAMEMODE_ROTATION_10][break_order_rotation_10ball[k]] = pos;
+                    if (k < break_order_rotation_6ball.Length) initialPositions[GAMEMODE_ROTATION_6][break_order_rotation_6ball[k]] = pos;
+                    k++;
+                }
+            }
+            
+            // 9balls
+            for (int i = 0, k = 0; i < 5; i++)
+            {
+                int rown = break_rows_9ball[i];
+                for (int j = 0; j <= rown; j++)
+                {
+                    initialPositions[GAMEMODE_ROTATION_9][break_order_rotation_9ball[k++]] = new Vector3
+                    (
+                        k_SPOT_POSITION_X + i * k_BALL_PL_Y + (rackConditionLocal == 0 ? 0 : UnityEngine.Random.Range(-k_RANDOMIZE_F, k_RANDOMIZE_F)),
+                        0.0f,
+                        (-rown + j * 2) * k_BALL_PL_X + (rackConditionLocal == 0 ? 0 : UnityEngine.Random.Range(-k_RANDOMIZE_F, k_RANDOMIZE_F))
                     );
                 }
             }
@@ -3054,7 +3117,7 @@ public class BilliardsModule : UdonSharpBehaviour
     {
         int target = findLowestUnpocketedBall(ballsPocketedLocal);
         //ballsP[target] = new Vector3(x, 0.0f, 0.0f);
-        pocketedballUponPool(0x1u << target, x, break_order_rotation.Length);
+        pocketedballUponPool(0x1u << target, x, (isRotation15Balls ? break_order_rotation_15ball.Length : (isRotation10Balls ? break_order_rotation_10ball.Length : (isRotation9Balls ? break_order_rotation_9ball.Length : break_order_rotation_6ball.Length))));
 
         // if (semiAutoCallBallLocal)
         // {
@@ -3117,7 +3180,7 @@ public class BilliardsModule : UdonSharpBehaviour
 #if TKCH_DEBUG_NEXTBALL_REPOSITION_STATE
             _LogInfo($"  x = {x}");
 #endif
-            pocketedballUponPool(0x1u << target, x, break_order_rotation.Length);
+            pocketedballUponPool(0x1u << target, x, (isRotation15Balls ? break_order_rotation_15ball.Length : (isRotation10Balls ? break_order_rotation_10ball.Length : (isRotation9Balls ? break_order_rotation_9ball.Length : break_order_rotation_6ball.Length))));
         }
         
         // if (semiAutoCallBallLocal)
@@ -3153,7 +3216,7 @@ public class BilliardsModule : UdonSharpBehaviour
         {
             // next ballがkitchen内の場合はセンターに移動させる
             //ballsP[target] = new Vector3(0.0f, 0.0f, 0.0f);
-            pocketedballUponPool(0x1u << target, 0, break_order_rotation.Length);
+            pocketedballUponPool(0x1u << target, 0, (isRotation15Balls ? break_order_rotation_15ball.Length : (isRotation10Balls ? break_order_rotation_10ball.Length : (isRotation9Balls ? break_order_rotation_9ball.Length : break_order_rotation_6ball.Length))));
         }
     }
     
@@ -3189,10 +3252,18 @@ public class BilliardsModule : UdonSharpBehaviour
         }
         
         int target = 0;
+#if TKCH_6BALL_HIDE8
+        uint ball_bit = isRotation6Balls ? 0x4u : 0x2u;
+#else
         uint ball_bit = 0x2u;
-        for (int k = 0; k < break_order_rotation.Length; k++)
+#endif
+        for (int k = 0; k < (isRotation15Balls ? break_order_rotation_15ball.Length : (isRotation10Balls ? break_order_rotation_10ball.Length : (isRotation9Balls ? break_order_rotation_9ball.Length : break_order_rotation_6ball.Length))); k++)
         {
+#if TKCH_6BALL_HIDE8
+            int i = k + (isRotation6Balls ? 2 : 1);
+#else
             int i = k + 1;
+#endif
             if ((calledBallsLocal & ball_bit) != 0x0u)
             {
                 target = i;
@@ -3864,8 +3935,16 @@ public class BilliardsModule : UdonSharpBehaviour
         uint uponBalls = 0x0u;
         int uponBallsCount = 0;
         uint uponRacks = 0x0u;
+#if TKCH_6BALL_HIDE8
+        uint ball_bit = isRotation6Balls ? 0x4u : 0x2u;
+#else
         uint ball_bit = 0x2u;
+#endif
+#if TKCH_6BALL_HIDE8
+        for (int i = (isRotation6Balls ? 2 : 1); i < ballsP.Length; i++)
+#else
         for (int i = 1; i < ballsP.Length; i++)
+#endif
         {
             if ((ballsPocketed & ball_bit) != 0x0u)
             {
@@ -3961,6 +4040,14 @@ public class BilliardsModule : UdonSharpBehaviour
         for (int i = 0; i < ballsP.Length; i++)
         {
             if (i == n)
+            {
+                continue;
+            }
+#if TKCH_6BALL_HIDE8
+            if ((isRotation10Balls && 10 < i) || (isRotation9Balls && 9 < i) || (isRotation6Balls && (i == 1 || 7 < i)))
+#else
+            if ((isRotation10Balls && 10 < i) || (isRotation9Balls && 9 < i) || (isRotation6Balls && 6 < i))
+#endif
             {
                 continue;
             }

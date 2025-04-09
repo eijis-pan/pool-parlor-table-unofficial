@@ -24,16 +24,21 @@ public class MenuManager : UdonSharpBehaviour
     [SerializeField] public UIButton button4Ball;
     [SerializeField] public UIButton button4BallJP;
     [SerializeField] public UIButton button4BallKR;
-    [SerializeField] public UIButton button60Win;
-    [SerializeField] public UIButton button90Win;
-    [SerializeField] public UIButton button120Win;
-    [SerializeField] public UIButton button180Win;
+    [SerializeField] public UIButton button40Win;
+    [SerializeField] public UIButton[] button60Win;
+    [SerializeField] public UIButton[] button90Win;
+    [SerializeField] public UIButton[] button120Win;
+    [SerializeField] public UIButton[] button180Win;
     [SerializeField] public UIButton button240Win;
     [SerializeField] public UIButton buttonTimerLeft;
     [SerializeField] public UIButton buttonTimerRight;
     [SerializeField] public UIButton buttonTeamsToggle;
     [SerializeField] public UIButton buttonGuidelineToggle;
     [SerializeField] public UIButton buttonLockingToggle;
+    [SerializeField] public UIButton button6BallsToggle;
+    [SerializeField] public UIButton button9BallsToggle;
+    [SerializeField] public UIButton button10BallsToggle;
+    [SerializeField] public UIButton button15BallsToggle;
     [SerializeField] public UIButton buttonRackSheetToggle;
     [SerializeField] public UIButton buttonWoodFrameToggle;
     // [SerializeField] public UIButton buttonSemiAutoCallBallToggle;
@@ -45,6 +50,10 @@ public class MenuManager : UdonSharpBehaviour
     [SerializeField] public UIButton buttonPlay;
     [SerializeField] public UIButton buttonJoinOrange;
     [SerializeField] public UIButton buttonJoinBlue;
+
+    [SerializeField] public GameObject rotation15ButtonsGroup;
+    [SerializeField] public GameObject rotation9ButtonsGroup;
+    [SerializeField] public GameObject rotation6ButtonsGroup;
 
     private BilliardsModule table;
 
@@ -59,7 +68,7 @@ public class MenuManager : UdonSharpBehaviour
 #endif
         table = table_;
         
-        button120Win._Init();
+        for (int i = 0; i < button120Win.Length; i++) button120Win[i]._Init();
         
         _RefreshTimer();
         _RefreshToggleSettings();
@@ -98,18 +107,22 @@ public class MenuManager : UdonSharpBehaviour
         table._LogInfo($"  button120Win.toggleState = {button120Win.toggleState}");
 #endif
         uint menuGameMode = table.gameModeLocal;
-        int goalPoints = table.goalPointsLocal;
 
         button8Ball._ResetPushButton();
         button9Ball._ResetPushButton();
         button4Ball._ResetPushButton();
         button4BallJP._ResetPushButton();
         button4BallKR._ResetPushButton();
-        button60Win._ResetPushButton();
-        button90Win._ResetPushButton();
-        button120Win._ResetPushButton();
-        button180Win._ResetPushButton();
+        button40Win._ResetPushButton();
+        for (int i = 0; i < button60Win.Length; i++) button60Win[i]._ResetPushButton();
+        for (int i = 0; i < button90Win.Length; i++) button90Win[i]._ResetPushButton();
+        for (int i = 0; i < button120Win.Length; i++) button120Win[i]._ResetPushButton();
+        for (int i = 0; i < button180Win.Length; i++) button180Win[i]._ResetPushButton();
         button240Win._ResetPushButton();
+        
+        rotation15ButtonsGroup.SetActive(false);
+        rotation9ButtonsGroup.SetActive(false);
+        rotation6ButtonsGroup.SetActive(false);
 
         switch (menuGameMode)
         {
@@ -135,30 +148,52 @@ public class MenuManager : UdonSharpBehaviour
                 button4BallJP.gameObject.SetActive(true);
                 button4BallKR.gameObject.SetActive(true);
                 break;
-            case 4:
-                switch (goalPoints)
+            default:
+                switch (menuGameMode)
                 {
-                    case 60:
-                        button60Win._SetButtonPushed();
+                    case BilliardsModule.GAMEMODE_ROTATION_15:
+                        rotation15ButtonsGroup.SetActive(true);
                         break;
-                    case 90:
-                        button90Win._SetButtonPushed();
+                    case BilliardsModule.GAMEMODE_ROTATION_10:
+                    case BilliardsModule.GAMEMODE_ROTATION_9:
+                        rotation9ButtonsGroup.SetActive(true);
                         break;
-                    case 120:
-                        button120Win._SetButtonPushed();
-                        break;
-                    case 180:
-                        button180Win._SetButtonPushed();
-                        break;
-                    case 240:
-                        button240Win._SetButtonPushed();
+                    case BilliardsModule.GAMEMODE_ROTATION_6:
+                        rotation6ButtonsGroup.SetActive(true);
                         break;
                 }
+                refreshGoalPoint();
                 button4BallJP.gameObject.SetActive(false);
                 button4BallKR.gameObject.SetActive(false);
-                table.scoreScreen.UpdateGameNameWithNumber("Rotation", goalPoints);
                 break;
         }
+    }
+
+    public void refreshGoalPoint()
+    {
+        int goalPoints = table.goalPointsLocal;
+        switch (goalPoints)
+        {
+            case 40:
+                button40Win._SetButtonPushed();
+                break;
+            case 60:
+                for (int i = 0; i < button60Win.Length; i++) button60Win[i]._SetButtonPushed();
+                break;
+            case 90:
+                for (int i = 0; i < button90Win.Length; i++) button90Win[i]._SetButtonPushed();
+                break;
+            case 120:
+                for (int i = 0; i < button120Win.Length; i++) button120Win[i]._SetButtonPushed();
+                break;
+            case 180:
+                for (int i = 0; i < button180Win.Length; i++) button180Win[i]._SetButtonPushed();
+                break;
+            case 240:
+                button240Win._SetButtonPushed();
+                break;
+        }
+        table.scoreScreen.UpdateGameNameWithNumber("Rotation", goalPoints);
     }
 
     private void refreshJoinButtons()
@@ -256,12 +291,34 @@ public class MenuManager : UdonSharpBehaviour
         buttonTeamsToggle._SetButtonToggle(table.teamsLocal);
         buttonGuidelineToggle._SetButtonToggle(!table.noGuidelineLocal);
         buttonLockingToggle._SetButtonToggle(!table.noLockingLocal);
+        button6BallsToggle._ResetPushButton();
+        button9BallsToggle._ResetPushButton();
+        button10BallsToggle._ResetPushButton();
+        button15BallsToggle._ResetPushButton();
         buttonRackSheetToggle._ResetPushButton();
         buttonWoodFrameToggle._ResetPushButton();
         // buttonSemiAutoCallBallToggle._SetButtonToggle(table.semiAutoCallBallLocal);
         // buttonSemiAutoCallPocketToggle._SetButtonToggle(table.semiAutoCallPocketLocal);
         buttonSemiAutoCallToggle._SetButtonToggle(table.semiAutoCallLocal);
         buttonCallPassOptionToggle._SetButtonToggle(table.callPassOptionLocal);
+
+        if (table.gameModeLocal == BilliardsModule.GAMEMODE_ROTATION_15)
+        {
+            button15BallsToggle._SetButtonPushed();
+        }
+        else if (table.gameModeLocal == BilliardsModule.GAMEMODE_ROTATION_10)
+        {
+            button10BallsToggle._SetButtonPushed();
+        }
+        else if (table.gameModeLocal == BilliardsModule.GAMEMODE_ROTATION_9)
+        {
+            button9BallsToggle._SetButtonPushed();
+        }
+        else if (table.gameModeLocal == BilliardsModule.GAMEMODE_ROTATION_6)
+        {
+            button6BallsToggle._SetButtonPushed();
+        }
+        
         if (table.rackConditionLocal == 0)
         {
             buttonRackSheetToggle._SetButtonPushed();
@@ -282,16 +339,21 @@ public class MenuManager : UdonSharpBehaviour
         button4Ball.disableInteractions = isNormalPlayer;
         button4BallJP.disableInteractions = isNormalPlayer;
         button4BallKR.disableInteractions = isNormalPlayer;
-        button60Win.disableInteractions = isNormalPlayer;
-        button90Win.disableInteractions = isNormalPlayer;
-        button120Win.disableInteractions = isNormalPlayer;
-        button180Win.disableInteractions = isNormalPlayer;
+        button40Win.disableInteractions = isNormalPlayer;
+        for (int i = 0; i < button60Win.Length; i++) button60Win[i].disableInteractions = isNormalPlayer;
+        for (int i = 0; i < button90Win.Length; i++) button90Win[i].disableInteractions = isNormalPlayer;
+        for (int i = 0; i < button120Win.Length; i++) button120Win[i].disableInteractions = isNormalPlayer;
+        for (int i = 0; i < button180Win.Length; i++) button180Win[i].disableInteractions = isNormalPlayer;
         button240Win.disableInteractions = isNormalPlayer;
         buttonTeamsToggle.disableInteractions = isNormalPlayer;
         buttonGuidelineToggle.disableInteractions = isNormalPlayer;
         buttonLockingToggle.disableInteractions = isNormalPlayer;
         buttonTimerLeft.disableInteractions = isNormalPlayer;
         buttonTimerRight.disableInteractions = isNormalPlayer;
+        button6BallsToggle.disableInteractions = isNormalPlayer;
+        button9BallsToggle.disableInteractions = isNormalPlayer;
+        button10BallsToggle.disableInteractions = isNormalPlayer;
+        button15BallsToggle.disableInteractions = isNormalPlayer;
         buttonRackSheetToggle.disableInteractions = isNormalPlayer;
         buttonWoodFrameToggle.disableInteractions = isNormalPlayer;
         // buttonSemiAutoCallBallToggle.disableInteractions = isNormalPlayer;
@@ -354,6 +416,10 @@ public class MenuManager : UdonSharpBehaviour
             {
                 table._TriggerGameModeChanged(3);
             }
+            else if (button.name == "40Win")
+            {
+                table._TriggerGoalPointsChanged(40);
+            }
             else if (button.name == "60Win")
             {
                 table._TriggerGoalPointsChanged(60);
@@ -385,6 +451,22 @@ public class MenuManager : UdonSharpBehaviour
             else if (button.name == "LockingToggle")
             {
                 table._TriggerNoLockingChanged(!button.toggleState);
+            }
+            else if (button.name == "15Balls")
+            {
+                table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_ROTATION_15);
+            }
+            else if (button.name == "10Balls")
+            {
+                table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_ROTATION_10);
+            }
+            else if (button.name == "9Balls")
+            {
+                table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_ROTATION_9);
+            }
+            else if (button.name == "6Balls")
+            {
+                table._TriggerGameModeChanged(BilliardsModule.GAMEMODE_ROTATION_6);
             }
             else if (button.name == "RackSheetToggle")
             {

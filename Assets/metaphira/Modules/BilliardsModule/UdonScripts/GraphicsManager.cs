@@ -1,5 +1,6 @@
 ﻿//#define TKCH_DEBUG_BREAKING_FOUL
 // #define TKCH_DEBUG_CALLSHOT_POCKET_MARKER
+#define TKCH_6BALL_HIDE8
 
 using UdonSharp;
 using UnityEngine;
@@ -731,13 +732,35 @@ int uniform_cue_colour;
 
     public void _ShowBalls()
     {
-        if (table.is9Ball)
+        if (table.is9Ball || table.isRotation9Balls)
         {
             for (int i = 0; i <= 9; i++)
                 table.balls[i].SetActive(true);
 
             for (int i = 10; i < 16; i++)
                 table.balls[i].SetActive(false);
+        }
+        else if (table.isRotation10Balls)
+        {
+            for (int i = 0; i <= 10; i++)
+                table.balls[i].SetActive(true);
+
+            for (int i = 11; i < 16; i++)
+                table.balls[i].SetActive(false);
+        }
+        else if (table.isRotation6Balls)
+        {
+            for (int i = 0; i <= 7; i++)
+                table.balls[i].SetActive(true);
+
+#if TKCH_6BALL_HIDE8
+            table.balls[1].SetActive(false);
+            for (int i = 8; i < 16; i++)
+                table.balls[i].SetActive(false);
+#else
+            for (int i = 7; i < 16; i++)
+                table.balls[i].SetActive(false);
+#endif
         }
         else if (table.is4Ball)
         {
