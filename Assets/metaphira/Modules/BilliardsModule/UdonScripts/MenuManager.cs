@@ -41,6 +41,8 @@ public class MenuManager : UdonSharpBehaviour
     [SerializeField] public UIButton button15BallsToggle;
     [SerializeField] public UIButton buttonRackSheetToggle;
     [SerializeField] public UIButton buttonWoodFrameToggle;
+    [SerializeField] public UIButton buttonPushOutToggle;
+    [SerializeField] public UIButton buttonCallShotToggle;
     // [SerializeField] public UIButton buttonSemiAutoCallBallToggle;
     // [SerializeField] public UIButton buttonSemiAutoCallPocketToggle;
     [SerializeField] public UIButton buttonSemiAutoCallToggle;
@@ -297,10 +299,14 @@ public class MenuManager : UdonSharpBehaviour
         button15BallsToggle._ResetPushButton();
         buttonRackSheetToggle._ResetPushButton();
         buttonWoodFrameToggle._ResetPushButton();
+        buttonPushOutToggle._SetButtonToggle(table.enablePushOutLocal);
+        buttonCallShotToggle._SetButtonToggle(table.requireCallShotLocal);
         // buttonSemiAutoCallBallToggle._SetButtonToggle(table.semiAutoCallBallLocal);
         // buttonSemiAutoCallPocketToggle._SetButtonToggle(table.semiAutoCallPocketLocal);
-        buttonSemiAutoCallToggle._SetButtonToggle(table.semiAutoCallLocal);
-        buttonCallPassOptionToggle._SetButtonToggle(table.callPassOptionLocal);
+        buttonSemiAutoCallToggle.gameObject.SetActive(table.requireCallShotLocal);
+        buttonSemiAutoCallToggle._SetButtonToggle(table.requireCallShotLocal && table.semiAutoCallLocal);
+        buttonCallPassOptionToggle.gameObject.SetActive(table.requireCallShotLocal);
+        buttonCallPassOptionToggle._SetButtonToggle(table.requireCallShotLocal && table.callPassOptionLocal);
 
         if (table.gameModeLocal == BilliardsModule.GAMEMODE_ROTATION_15)
         {
@@ -356,6 +362,8 @@ public class MenuManager : UdonSharpBehaviour
         button15BallsToggle.disableInteractions = isNormalPlayer;
         buttonRackSheetToggle.disableInteractions = isNormalPlayer;
         buttonWoodFrameToggle.disableInteractions = isNormalPlayer;
+        buttonPushOutToggle.disableInteractions = isNormalPlayer;
+        buttonCallShotToggle.disableInteractions = isNormalPlayer;
         // buttonSemiAutoCallBallToggle.disableInteractions = isNormalPlayer;
         // buttonSemiAutoCallPocketToggle.disableInteractions = isNormalPlayer;
         buttonSemiAutoCallToggle.disableInteractions = isNormalPlayer;
@@ -481,6 +489,14 @@ public class MenuManager : UdonSharpBehaviour
                 table._LogInfo($"  name = {button.name}, toggleState = {button.toggleState}");
 #endif
                 table._TriggerRackCondisionChanged(1);
+            }
+            else if (button.name == "PushOutToggle")
+            {
+                table._TriggerEnablePushOutChanged(button.toggleState);
+            }
+            else if (button.name == "CallShotToggle")
+            {
+                table._TriggerRequireCallShotChanged(button.toggleState);
             }
             // else if (button.name == "SemiAutoCallBallToggle")
             // {

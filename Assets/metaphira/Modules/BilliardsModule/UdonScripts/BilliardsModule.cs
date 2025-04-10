@@ -231,6 +231,7 @@ public class BilliardsModule : UdonSharpBehaviour
     [NonSerialized] public uint gameModeLocal;
     [NonSerialized] public int goalPointsLocal = 120;
     [NonSerialized] public uint rackConditionLocal = 1;
+    [NonSerialized] public bool requireCallShotLocal;
     // [NonSerialized] public bool semiAutoCallBallLocal;
     // [NonSerialized] public bool semiAutoCallPocketLocal;
     [NonSerialized] public bool semiAutoCallLocal;
@@ -411,6 +412,8 @@ public class BilliardsModule : UdonSharpBehaviour
         isRotation = true;
         isRotation15Balls = true;
         rackConditionLocal = 1;
+        enablePushOutLocal = true;
+        requireCallShotLocal = true;
         // semiAutoCallBallLocal = true;
         // semiAutoCallPocketLocal = true;
         semiAutoCallLocal = true;
@@ -421,6 +424,8 @@ public class BilliardsModule : UdonSharpBehaviour
         networkingManager._Init(this);
         networkingManager.gameModeSynced = (byte)gameModeLocal;
         networkingManager.rackConditionSynced = (byte)rackConditionLocal;
+        networkingManager.enablePushOutSynced = enablePushOutLocal;
+        networkingManager.requireCallShotSynced = requireCallShotLocal;
         // networkingManager.semiAutoCallBallSynced = semiAutoCallBallLocal;
         // networkingManager.semiAutoCallPocketSynced = semiAutoCallPocketLocal;
         networkingManager.semiAutoCallSynced = semiAutoCallLocal;
@@ -580,6 +585,16 @@ public class BilliardsModule : UdonSharpBehaviour
     public void _TriggerRackCondisionChanged(uint rackCondition)
     {
         networkingManager._OnRackCondisionChanged(rackCondition);
+    }
+
+    public void _TriggerEnablePushOutChanged(bool pushOutEnabled)
+    {
+        networkingManager._OnEnablePushOutChanged(pushOutEnabled);
+    }
+
+    public void _TriggerRequireCallShotChanged(bool callShotEnabled)
+    {
+        networkingManager._OnRequireCallShotChanged(callShotEnabled);
     }
 
     // public void _TriggerSemiAutoCallBallChanged(bool semiAutoCallBallEnabled)
@@ -1058,6 +1073,8 @@ public class BilliardsModule : UdonSharpBehaviour
             networkingManager.noGuidelineSynced,
             networkingManager.noLockingSynced,
             networkingManager.rackConditionSynced,
+            networkingManager.enablePushOutSynced,
+            networkingManager.requireCallShotSynced,
             // networkingManager.semiAutoCallBallSynced,
             // networkingManager.semiAutoCallPocketSynced
             networkingManager.semiAutoCallSynced,
@@ -1197,6 +1214,7 @@ public class BilliardsModule : UdonSharpBehaviour
 
     private void onRemoteGameSettingsUpdated(uint gameModeSynced, int goalPointsSynced, uint timerSynced, 
         bool teamsSynced, bool noGuidelineSynced, bool noLockingSynced, uint rackConditionSynced,
+        bool enablePushOutSynced, bool requireCallShotSynced,
         // bool semiAutoCallBallSynced, bool semiAutoCallPocketSynced)
         bool semiAutoCallSynced, bool callPassOptionSynced)
     {
@@ -1208,6 +1226,8 @@ public class BilliardsModule : UdonSharpBehaviour
             noGuidelineLocal == noGuidelineSynced &&
             noLockingLocal == noLockingSynced &&
             rackConditionLocal == rackConditionSynced &&
+            enablePushOutLocal == enablePushOutSynced &&
+            requireCallShotLocal == requireCallShotSynced &&
             semiAutoCallLocal == semiAutoCallSynced &&
             callPassOptionLocal == callPassOptionSynced
         )
@@ -1216,7 +1236,7 @@ public class BilliardsModule : UdonSharpBehaviour
         }
 
         // _LogInfo($"onRemoteGameSettingsUpdated gameMode={gameModeSynced} goalPoints={goalPointsSynced} timer={timerSynced} teams={teamsSynced} guideline={!noGuidelineSynced} locking={!noLockingSynced} rackCondition={rackConditionSynced} semiAutoCallBall={semiAutoCallBallSynced} semiAutoCallPocket={semiAutoCallPocketSynced}");
-        _LogInfo($"onRemoteGameSettingsUpdated gameMode={gameModeSynced} goalPoints={goalPointsSynced} timer={timerSynced} teams={teamsSynced} guideline={!noGuidelineSynced} locking={!noLockingSynced} rackCondition={rackConditionSynced} semiAutoCall={semiAutoCallSynced} callPassOption={callPassOptionSynced}");
+        _LogInfo($"onRemoteGameSettingsUpdated gameMode={gameModeSynced} goalPoints={goalPointsSynced} timer={timerSynced} teams={teamsSynced} guideline={!noGuidelineSynced} locking={!noLockingSynced} rackCondition={rackConditionSynced} pushOut={enablePushOutSynced} callShot={requireCallShotSynced} semiAutoCall={semiAutoCallSynced} callPassOption={callPassOptionSynced}");
 
         bool refreshToggles = false;
         if (gameModeLocal != gameModeSynced || goalPointsLocal != goalPointsSynced)
@@ -1267,6 +1287,18 @@ public class BilliardsModule : UdonSharpBehaviour
         if (rackConditionLocal != rackConditionSynced)
         {
             rackConditionLocal = rackConditionSynced;
+            refreshToggles = true;
+        }
+
+        if (enablePushOutLocal != enablePushOutSynced)
+        {
+            enablePushOutLocal = enablePushOutSynced;
+            refreshToggles = true;
+        }
+
+        if (requireCallShotLocal != requireCallShotSynced)
+        {
+            requireCallShotLocal = requireCallShotSynced;
             refreshToggles = true;
         }
 
@@ -2108,7 +2140,7 @@ public class BilliardsModule : UdonSharpBehaviour
         if (isRotation)
         {
             uint pointPockets = pointPocketsLocal & (0x1u << pocketId);
-            if ((calledBallsLocal & (0x1u << id)) != 0 && 
+            if (!requireCallShotLocal ||(calledBallsLocal & (0x1u << id)) != 0 && 
                 pointPockets != 0)
             {
                 targetPocketedLocal |= 1U << id;
@@ -3015,8 +3047,8 @@ public class BilliardsModule : UdonSharpBehaviour
 
         if (isRotation && isOurTurnVar)
         {
-            this.transform.Find("intl.controls/callShotLock").gameObject.SetActive(true);
-            this.transform.Find("intl.controls/callSafety").gameObject.SetActive(true);
+            this.transform.Find("intl.controls/callShotLock").gameObject.SetActive(requireCallShotLocal);
+            this.transform.Find("intl.controls/callSafety").gameObject.SetActive(requireCallShotLocal);
             this.transform.Find("intl.controls/pushOut").gameObject.SetActive(enablePushOutLocal && (pushOutStateLocal == PUSHOUT_DONT || pushOutStateLocal == PUSHOUT_DOING));
             this.transform.Find("intl.controls/skipturn").gameObject.SetActive(practiceEnable || (enablePushOutLocal && (pushOutStateLocal == PUSHOUT_REACTIONING)) || (pushOutStateLocal == PUSHOUT_ILLEGAL_REACTIONING));
         }
@@ -3055,9 +3087,9 @@ public class BilliardsModule : UdonSharpBehaviour
                 desktopManager._ChangeCallShotPushOut(!canPushOut);
             }
 #else            
-            desktopManager._CallShotSetActive(true);
-            desktopManager._CallSafetySetActive(true);
-            bool canPushOut = (pushOutStateLocal == PUSHOUT_DONT || pushOutStateLocal == PUSHOUT_DOING);
+            desktopManager._CallShotSetActive(requireCallShotLocal);
+            desktopManager._CallSafetySetActive(requireCallShotLocal);
+            bool canPushOut = enablePushOutLocal && (pushOutStateLocal == PUSHOUT_DONT || pushOutStateLocal == PUSHOUT_DOING);
             desktopManager._PushOutSetActive(canPushOut);
 #endif  
         }
@@ -3616,7 +3648,7 @@ public class BilliardsModule : UdonSharpBehaviour
         // if (debugLogFlg) _LogInfo($"TKCH TKCH_DEBUG_SEMIAUTO_CALL_AFTER_REPOSITION cueBallFixed = {cueBallFixed}");
 #endif
 
-        if (isRotation && gameLive && canPlayLocal && isOurTurn() && afterBreak && cueBallFixed)
+        if (isRotation && gameLive && canPlayLocal && isOurTurn() && afterBreak && requireCallShotLocal && cueBallFixed)
         {
 #if EIJIS_DEBUG_SEMIAUTO_CALL_FINDLOGIC
             // if (debugLogFlg) _LogInfo($"TKCH SEMIAUTO_CALL semiAutoCallBall = {semiAutoCallBallLocal}, semiAutoCalledTimeBall = {semiAutoCalledTimeBall}, calledBallId = {calledBallId}");
@@ -4069,7 +4101,7 @@ public class BilliardsModule : UdonSharpBehaviour
 
     public bool CanShotCondition()
     {
-        return (!isRotation || !afterBreak || safetyCalledLocal || (calledBallsLocal != 0 && pointPocketsLocal != 0) || (pushOutStateLocal == PUSHOUT_DOING));
+        return (!isRotation || !requireCallShotLocal || !afterBreak || safetyCalledLocal || (calledBallsLocal != 0 && pointPocketsLocal != 0) || (pushOutStateLocal == PUSHOUT_DOING));
     }
     #endregion
 

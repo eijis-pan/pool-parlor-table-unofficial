@@ -250,8 +250,11 @@ public class DesktopManager : UdonSharpBehaviour
                 renderCuePosition(shotDirection);
                 updateSpinIndicator();
                 updateJumpIndicator();
-                updateCallShotIndicator();
-                updateCallSafetyIndicator();
+                if (table.requireCallShotLocal)
+                {
+                    updateCallShotIndicator();
+                    updateCallSafetyIndicator();
+                }
                 if (table.enablePushOutLocal) updatePushOutIndicator();
             }
         }
@@ -523,6 +526,8 @@ public class DesktopManager : UdonSharpBehaviour
 
     private void updateCallShotIndicator()
     {
+        if (!table.isReposition || !table.requireCallShotLocal) return;
+
         if (Input.GetKeyDown(KeyCode.P))
         { 
             int id = nextPocketOrder(!(Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)));

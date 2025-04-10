@@ -147,7 +147,7 @@ public class StandardPhysicsManager : UdonSharpBehaviour
             {
                 if (!ReferenceEquals(null, Networking.LocalPlayer) && Networking.LocalPlayer.IsUserInVR())
                 {
-                    if (table.isRotation)
+                    if (table.requireCallShotLocal && table.isRotation)
                     {
                         bool hit = false;
                         for (int i = 1; i < balls_P.Length; i++)

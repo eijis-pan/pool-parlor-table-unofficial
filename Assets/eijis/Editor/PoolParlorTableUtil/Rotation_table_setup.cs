@@ -73,6 +73,8 @@ namespace EijisPoolParlorTableUtil
 					"15Balls",
 					"RackSheetToggle",
 					"WoodFrameToggle",
+					"PushOutToggle",
+					"CallShotToggle",
 					"SemiAutoCallToggle",
 					"CallPassOptionToggle",
 					"RackSheet",
@@ -188,6 +190,8 @@ namespace EijisPoolParlorTableUtil
 			{ "button15BallsToggle", "intl.menu/SettingsMenu/15Balls" },
 			{ "buttonRackSheetToggle", "intl.menu/SettingsMenu/RackSheetToggle" },
 			{ "buttonWoodFrameToggle", "intl.menu/SettingsMenu/WoodFrameToggle" },
+			{ "buttonPushOutToggle", "intl.menu/SettingsMenu/PushOutToggle" },
+			{ "buttonCallShotToggle", "intl.menu/SettingsMenu/CallShotToggle" },
 			{ "buttonSemiAutoCallToggle", "intl.menu/SettingsMenu/SemiAutoCallToggle" },
 			{ "buttonCallPassOptionToggle", "intl.menu/SettingsMenu/CallPassOptionToggle" }
 		};
@@ -693,6 +697,8 @@ namespace EijisPoolParlorTableUtil
                 { "15Balls", new MenuButtonDef { TextureName = "15BallsOff.psd", DesktopOutline = _desktopOutline }},
                 { "RackSheetToggle", new MenuButtonDef { TextureName = "RackSheetOff.psd", DesktopOutline = _desktopOutline }},
                 { "WoodFrameToggle", new MenuButtonDef { TextureName = "WoodFrameOff.psd", DesktopOutline = _desktopOutline }},
+                { "PushOutToggle", new MenuButtonDef { TextureName = "PushOutOff.psd", DesktopOutline = _desktopOutline }},
+                { "CallShotToggle", new MenuButtonDef { TextureName = "CallShotOff.psd", DesktopOutline = _desktopOutline }},
                 { "SemiAutoCallToggle", new MenuButtonDef { TextureName = "SemiAutoCallOff.psd", DesktopOutline = _desktopOutline }},
                 { "SemiAutoCallBallToggle", new MenuButtonDef { TextureName = "SemiAutoCallBallOff.psd", DesktopOutline = _desktopOutline }},
                 { "SemiAutoCallPocketToggle", new MenuButtonDef { TextureName = "SemiAutoCallPocketOff.psd", DesktopOutline = _desktopOutline }},

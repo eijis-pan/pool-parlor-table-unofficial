@@ -73,7 +73,9 @@ public class NetworkingManager : UdonSharpBehaviour
     [UdonSynced] [NonSerialized] public byte gameModeSynced;
 
     [UdonSynced] [NonSerialized] public int goalPointsSynced = 120;
+    [UdonSynced] [NonSerialized] public bool enablePushOutSynced;
     [UdonSynced] [NonSerialized] public byte rackConditionSynced = 0;
+    [UdonSynced] [NonSerialized] public bool requireCallShotSynced;
     // [UdonSynced] [NonSerialized] public bool semiAutoCallBallSynced;
     // [UdonSynced] [NonSerialized] public bool semiAutoCallPocketSynced;
     [UdonSynced] [NonSerialized] public bool semiAutoCallSynced;
@@ -625,6 +627,20 @@ public class NetworkingManager : UdonSharpBehaviour
     public void _OnRackCondisionChanged(uint rackCondition)
     {
         rackConditionSynced = (byte)rackCondition;
+
+        bufferMessages(false);
+    }
+
+    public void _OnEnablePushOutChanged(bool pushOutEnabled)
+    {
+        enablePushOutSynced = pushOutEnabled;
+
+        bufferMessages(false);
+    }
+
+    public void _OnRequireCallShotChanged(bool callShotEnabled)
+    {
+        requireCallShotSynced = callShotEnabled;
 
         bufferMessages(false);
     }
