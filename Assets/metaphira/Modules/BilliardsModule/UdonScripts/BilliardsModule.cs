@@ -409,6 +409,7 @@ public class BilliardsModule : UdonSharpBehaviour
 
         gameModeLocal = 4;
         isRotation = true;
+        isRotation15Balls = true;
         rackConditionLocal = 1;
         // semiAutoCallBallLocal = true;
         // semiAutoCallPocketLocal = true;
@@ -3252,18 +3253,10 @@ public class BilliardsModule : UdonSharpBehaviour
         }
         
         int target = 0;
-#if TKCH_6BALL_HIDE8
-        uint ball_bit = isRotation6Balls ? 0x4u : 0x2u;
-#else
         uint ball_bit = 0x2u;
-#endif
-        for (int k = 0; k < (isRotation15Balls ? break_order_rotation_15ball.Length : (isRotation10Balls ? break_order_rotation_10ball.Length : (isRotation9Balls ? break_order_rotation_9ball.Length : break_order_rotation_6ball.Length))); k++)
+        for (int k = 0; k < break_order_rotation_15ball.Length; k++)
         {
-#if TKCH_6BALL_HIDE8
-            int i = k + (isRotation6Balls ? 2 : 1);
-#else
             int i = k + 1;
-#endif
             if ((calledBallsLocal & ball_bit) != 0x0u)
             {
                 target = i;
