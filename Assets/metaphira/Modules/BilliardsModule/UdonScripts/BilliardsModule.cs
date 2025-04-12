@@ -2995,7 +2995,7 @@ public class BilliardsModule : UdonSharpBehaviour
         // next ballがkitchen内の場合はセンターに移動させる
         checkNextInKitchenThenMoveToCenter();
         
-        ballsP[0] = initialPositions[gameModeLocal][0];
+        ballsP[0] = new Vector3(-k_SPOT_POSITION_X, 0.0f, 0.0f); // initialPositions[gameModeLocal][0];
 #if TKCH_DEBUG_NEXTBALL_REPOSITION_STATE
         _LogInfo($"  nextBallRepositionStateLocal = 0x{nextBallRepositionStateLocal:X02}");
 #endif
