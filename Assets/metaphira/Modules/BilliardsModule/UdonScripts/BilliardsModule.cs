@@ -2355,7 +2355,7 @@ public class BilliardsModule : UdonSharpBehaviour
                                    (afterBreak && cushionAfterFirstHit == 0));
                 
                 reBreakAllowed = !isAnyPocketSink && 
-                                 !afterBreak && (SoftwareFallback(cushionObjectiveBallsOnBreak) < 4);
+                                 !afterBreak && (SoftwareFallback(cushionObjectiveBallsOnBreak) < (isRotation6Balls ? 2 : (isRotation15Balls ? 4 : 3)));
 
                 foulCondition = isScratch || isWrongHit || isNoTouch || isNoCushon;
                 isObjectiveSink = (targetPocketedLocal & pocketMask) > (targetPocketedOrig & pocketMask);
