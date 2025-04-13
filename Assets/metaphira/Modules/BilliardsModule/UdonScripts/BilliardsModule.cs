@@ -2067,7 +2067,7 @@ public class BilliardsModule : UdonSharpBehaviour
                     if (0 == (cushionObjectiveBallsOnBreak & ball_bit))
                     {
                         int cushionBallCount = (int)SoftwareFallback(cushionObjectiveBallsOnBreak);
-                        if (cushionBallCount < 4)
+                        if (cushionBallCount < (isRotation6Balls ? 2 : ((isRotation10Balls || isRotation9Balls) ? 3 : 2)))
                         {
                             graphicsManager._SpawnCushionTouch(pos, cushionBallCount);
                         }
