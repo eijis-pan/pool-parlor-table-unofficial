@@ -526,7 +526,7 @@ public class DesktopManager : UdonSharpBehaviour
 
     private void updateCallShotIndicator()
     {
-        if (!table.isReposition || !table.requireCallShotLocal) return;
+        if (!table.isRotation || !table.requireCallShotLocal) return;
 
         if (Input.GetKeyDown(KeyCode.P))
         { 
